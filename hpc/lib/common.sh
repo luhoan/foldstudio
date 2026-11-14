@@ -99,14 +99,16 @@ fs_on_preempt() {
 }
 
 # ---------------------------------------------------------------- env / versions
+# fs_activate_env [conda-env-name]  -- defaults to ${FS_CONDA_ENV}
 fs_activate_env() {
+  local want="${1:-${FS_CONDA_ENV}}"
   case "${FS_ENV_MODE}" in
     conda)
       # `conda activate` needs the shell hook in a non-interactive shell.
       if command -v conda >/dev/null 2>&1; then
         # shellcheck source=/dev/null
         eval "$(conda shell.bash hook)" || fs_die "conda shell hook failed"
-        conda activate "${FS_CONDA_ENV}" || fs_die "conda activate ${FS_CONDA_ENV} failed (run hpc/10_setup_env.sh first)"
+        conda activate "${want}" || fs_die "conda activate ${want} failed (run hpc/10_setup_env.sh first)"
       else
         fs_die "FS_ENV_MODE=conda but 'conda' is not on PATH (try: module load miniconda3, or set FS_ENV_MODE=venv)"
       fi
@@ -199,6 +201,7 @@ fs_stage_begin() {
   export FS_STAGE
   FS_STAGE_T0="$(fs_now)"
   FS_STAGE_PREEMPTED=0
+  FS_STAGE_ENDED=0
   fs_mkdirs
   FS_STAGE_SCRATCH="${FS_SCRATCH}/${FS_STAGE}"
   export FS_STAGE_SCRATCH
@@ -241,12 +244,37 @@ PY
   fs_log "stage '${FS_STAGE}' begin (run_id=${FS_RUN_ID}, attempt restart_count=${SLURM_RESTART_COUNT:-0})"
 }
 
+# fs_stage_finish [outputs-json]
+# Record a successful stage_end ONCE, with the real output list. Use this at the
+# end of a stage that knows what it produced; the EXIT trap then stays quiet so
+# the ledger never contains two stage_end events for one attempt.
+fs_stage_finish() {
+  local outputs="${1:-[]}"
+  local wall
+  wall="$(fs_elapsed "${FS_STAGE_T0}")" || wall=null
+  fs_sync_back || true
+  fs_event stage_end \
+    --kv host="$(hostname)" \
+    --json-kv exit=0 \
+    --json-kv wall_seconds="$wall" \
+    --json-kv outputs="$outputs"
+  FS_STAGE_ENDED=1
+  fs_log "stage '${FS_STAGE}' finished cleanly wall=${wall}s"
+}
+
 # Called by the EXIT trap. Never let bookkeeping change the script's exit status.
 fs_stage_end_trap() {
   local rc="${1:-0}"
   trap - EXIT
   if [ "${FS_STAGE_PREEMPTED:-0}" = "1" ]; then
     # fs_on_preempt already recorded the truth; do not also claim a clean end.
+    return 0
+  fi
+  if [ "${FS_STAGE_ENDED:-0}" = "1" ]; then
+    # fs_stage_finish already recorded stage_end with the real output list.
+    # If we are nonetheless exiting non-zero, that happened after the work was
+    # done and recorded -- say so rather than silently dropping it.
+    [ "$rc" -ne 0 ] && fs_event note --kv message="non-zero exit ${rc} after stage_end was recorded"
     return 0
   fi
   local wall

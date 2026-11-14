@@ -80,8 +80,29 @@ export FS_REPO
 
 # How to activate the Python environment. "conda", "venv" or "apptainer".
 : "${FS_ENV_MODE:=conda}"
-: "${FS_CONDA_ENV:=foldstudio-hpc}"
 : "${FS_VENV_PATH:=${FS_ENV_DIR}/venv}"
+
+# One conda env per tool: their pins genuinely conflict.
+#   SE3nv  -- created by RFdiffusion's own env/SE3nv.yml. It pins python=3.9,
+#             pytorch=1.9, cudatoolkit=11.1, dgl-cuda11.1 (verified in upstream
+#             env/SE3nv.yml). IMPORTANT: pytorch 1.9 / cu11.1 has no sm_90
+#             kernels, so this env CANNOT run on H100. Target V100.
+#   ProteinMPNN needs only torch+numpy, so it reuses SE3nv by default.
+#   The predictor needs its own env (ESMFold requires python <= 3.9 and nvcc;
+#   ColabFold wants a recent jax), so never mix it with SE3nv.
+: "${FS_RFD_ENV:=SE3nv}"
+: "${FS_MPNN_ENV:=${FS_RFD_ENV}}"
+: "${FS_PRED_ENV:=foldstudio-pred}"
+# Generic default for fs_activate_env when a stage does not name an env.
+: "${FS_CONDA_ENV:=${FS_RFD_ENV}}"
+
+# Model weights live in $HOME (compute nodes may have no outbound network, and
+# the weights must be downloaded on the login node -- see hpc/11_fetch_weights.sh).
+: "${FS_RFD_MODELS:=${FS_WEIGHTS_DIR}/rfdiffusion}"
+# torch.hub cache: ESMFold pulls esmfold_v1 (several GB) through torch.hub.
+: "${FS_TORCH_HOME:=${FS_WEIGHTS_DIR}/torch}"
+export TORCH_HOME="${FS_TORCH_HOME}"
+: "${FS_COLABFOLD_WEIGHTS:=${FS_WEIGHTS_DIR}/colabfold}"
 
 # Structure predictor: "esmfold" or "colabfold". Pick whichever installed
 # cleanly (see hpc/README.md); the stage script dispatches on this.
