@@ -106,9 +106,15 @@ fs_activate_env() {
     conda)
       # `conda activate` needs the shell hook in a non-interactive shell.
       if command -v conda >/dev/null 2>&1; then
+        # Conda's hook and an env's activate.d scripts (MKL's sets
+        # MKL_INTERFACE_LAYER from an unset variable) are not written for
+        # `set -u`, so relax nounset across activation only and restore it.
+        local _fs_had_u=0
+        case "$-" in *u*) _fs_had_u=1; set +u ;; esac
         # shellcheck source=/dev/null
-        eval "$(conda shell.bash hook)" || fs_die "conda shell hook failed"
-        conda activate "${want}" || fs_die "conda activate ${want} failed (run hpc/10_setup_env.sh first)"
+        eval "$(conda shell.bash hook)" || { { [ "${_fs_had_u}" = 1 ] && set -u; }; fs_die "conda shell hook failed"; }
+        conda activate "${want}" || { { [ "${_fs_had_u}" = 1 ] && set -u; }; fs_die "conda activate ${want} failed (run hpc/10_setup_env.sh first)"; }
+        [ "${_fs_had_u}" = 1 ] && set -u || true
       else
         fs_die "FS_ENV_MODE=conda but 'conda' is not on PATH (try: module load miniconda3, or set FS_ENV_MODE=venv)"
       fi

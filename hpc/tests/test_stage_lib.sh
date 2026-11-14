@@ -243,6 +243,29 @@ else
   bad "default FS_TIME_GPU would be rejected by a 4-hour partition"
 fi
 
+# ------------------------------------------------------- 7b. conda activate under set -u
+# Real failure on Mill 2026-11-14: `conda activate SE3nv` aborted with
+#   .../activate.d/libblas_mkl_activate.sh: MKL_INTERFACE_LAYER: unbound variable
+# Conda's own activate.d scripts are not written for `set -u`, so fs_activate_env
+# must relax nounset across activation and restore it afterwards.
+MKLDIR="$(mktemp -d)"
+mkdir -p "${MKLDIR}/bin" "${MKLDIR}/activate.d"
+printf '#!/usr/bin/env bash\n[ "$1" = "shell.bash" ] || exit 0\necho "conda() { [ \\"\$1\\" = activate ] && . %s/activate.d/mkl.sh; }"\n' "${MKLDIR}" >"${MKLDIR}/bin/conda"
+chmod +x "${MKLDIR}/bin/conda"
+printf 'export MKL_INTERFACE_LAYER="${MKL_INTERFACE_LAYER}"\n' >"${MKLDIR}/activate.d/mkl.sh"
+if out="$(PATH="${MKLDIR}/bin:$PATH" bash -c '
+      set -euo pipefail
+      FS_ENV_MODE=conda; FS_CONDA_ENV=SE3nv
+      fs_die() { echo "DIED: $*" >&2; exit 1; }
+      source <(sed -n "/^fs_activate_env/,/^}/p" "'"${REPO}"'/hpc/lib/common.sh")
+      fs_activate_env SE3nv
+      case "$-" in *u*) echo RESTORED ;; *) echo LOST ;; esac' 2>&1)"; then
+  check "conda activate survives set -u and restores nounset" "$out" "RESTORED"
+else
+  bad "fs_activate_env died under set -u: ${out}"
+fi
+rm -rf "${MKLDIR}"
+
 # ------------------------------------------------------- 8. torn ledger line survives
 printf '{"event":"stage_start","stage":"tr' >>"$LEDGER"
 printf '\n' >>"$LEDGER"
