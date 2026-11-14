@@ -32,7 +32,7 @@ Errors are `{"detail": "<code>: <message>"}`.
 
 ## Scientific conventions
 
-- **pLDDT** is read from the B-factor column only for structures with `source=predicted`; values outside 0-100 are refused. Bins: `>90` very_high, `70-90` confident (inclusive), `50 to <70` low, `<50` very_low.
+- **pLDDT** is read from the B-factor column only for structures with `source=predicted`; values outside 0-100 are refused. Bins, lower bound inclusive: `>=90` very_high, `70 to <90` confident, `50 to <70` low, `<50` very_low. The explanation rules and the 3D viewer use the same boundaries (`tests/test_plddt_convention.py`).
 - **Alignment** uses CA atoms over explicitly matched residues (sequence alignment with BLOSUM62, or residue number). The response lists every pair, `aligned_atoms`, `atom_type`, chains and the 4x4 matrix (column vectors, mobile -> reference frame). RMSD is one optimal rigid superposition, no outlier rejection.
 - **TM-score** always comes with `tm_score_method`. With `USalign` on PATH it is sequence-independent USalign output; otherwise a built-in fixed-correspondence heuristic (may slightly underestimate official values).
 - Experiments: `executed`+`ok` must list outputs; `failed` must carry the real error. `PrecomputedRunner` never reports a run as executed.

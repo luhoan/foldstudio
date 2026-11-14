@@ -9,7 +9,7 @@ from tests.conftest import helix, make_pdb, upload
 
 @pytest.mark.parametrize(
     "v,expected",
-    [(100, "very_high"), (90.01, "very_high"), (90, "confident"), (70, "confident"), (69.99, "low"), (50, "low"), (49.99, "very_low"), (0, "very_low")],
+    [(100, "very_high"), (90.01, "very_high"), (90, "very_high"), (89.99, "confident"), (70, "confident"), (69.99, "low"), (50, "low"), (49.99, "very_low"), (0, "very_low")],
 )
 def test_bin_boundaries(v, expected):
     assert conf.classify(v) == expected
@@ -20,7 +20,7 @@ def test_profile_bins_and_histogram():
     model = sio.parse_structure(make_pdb(helix(10), bfactors=b), "pdb")
     p = conf.plddt_profile(model)
     counts = {x["name"]: x["count"] for x in p["bins"]}
-    assert counts == {"very_high": 2, "confident": 3, "low": 3, "very_low": 2}
+    assert counts == {"very_high": 3, "confident": 2, "low": 3, "very_low": 2}
     assert sum(h["count"] for h in p["histogram"]) == 10
     assert abs(sum(x["fraction"] for x in p["bins"]) - 1) < 1e-6
     assert p["mean"] == pytest.approx(sum(b) / 10) and "does not establish" in p["note"]

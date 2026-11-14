@@ -10,11 +10,16 @@ import statistics
 from app.errors import AppError
 from app.services.structure_io import aa_residues, res_label
 
-# Boundaries used throughout the app (documented in the README):
-#   very_high: > 90 | confident: 70-90 (inclusive) | low: 50 to <70 | very_low: < 50
+# One banding for the whole app -- this API, the explanation rules and the 3D
+# viewer's colours -- with the lower bound inclusive:
+#   very_high: >= 90 | confident: 70 to <90 | low: 50 to <70 | very_low: < 50
+# AlphaFold's published legend ("> 90", "90 > x > 70", ...) leaves the exact
+# boundary values unassigned; they are assigned here, once, so that a residue at
+# exactly 90.00 cannot be "very high" in one panel and "confident" in the next.
+# tests/test_plddt_convention.py holds the three implementations to it.
 BINS = [
-    ("very_high", "> 90"),
-    ("confident", "70 - 90"),
+    ("very_high", ">= 90"),
+    ("confident", "70 - <90"),
     ("low", "50 - <70"),
     ("very_low", "< 50"),
 ]
@@ -26,7 +31,7 @@ NOTE = (
 
 
 def classify(v: float) -> str:
-    if v > 90:
+    if v >= 90:
         return "very_high"
     if v >= 70:
         return "confident"
