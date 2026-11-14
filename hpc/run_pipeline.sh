@@ -192,16 +192,25 @@ PY
     IFS='|' read -r file logname kind <<<"${row}"
     mapfile -t cmd < <(build_cmd "${file}" "${logname}" "${kind}" "${dep}")
 
-    local jid rc=0
-    jid="$("${cmd[@]}" 2>&1)" || rc=$?
-    if [ "${rc}" -ne 0 ] || [ -z "${jid//[!0-9]/}" ]; then
+    # Mill's sbatch prints banner lines ("sbatch: Requested a total of 4 CPU(s)",
+    # a requeue-preemption warning, ...) around the id that --parsable emits, so
+    # the output cannot be used as the job id wholesale: keep stderr separate and
+    # take the last bare "<jobid>" or "<jobid>;<cluster>" line from stdout.
+    local jid rc=0 raw err
+    err="$(mktemp)"
+    raw="$("${cmd[@]}" 2>"${err}")" || rc=$?
+    jid="$(printf '%s\n' "${raw}" | sed -n 's/^\([0-9][0-9]*\)\(;.*\)\?$/\1/p' | tail -1)"
+    if [ "${rc}" -ne 0 ] || [ -z "${jid}" ]; then
+      raw="${raw}$(printf '\n--- stderr ---\n')$(cat "${err}")"
+      rm -f "${err}"
+      jid="${raw}"
       fs_event cmd --kv name="submit_${logname}" --kv host="$(hostname)" \
         --json-kv argv="$(fs_json_array "${cmd[@]}")" --json-kv exit="${rc:-1}" \
         --kv error="sbatch output: ${jid}"
       fs_die "sbatch failed for ${file}: ${jid}
 Already-submitted jobs: ${submitted[*]:-none}. Cancel them with: scancel ${submitted[*]:-}"
     fi
-    jid="${jid%%;*}"   # --parsable may return jobid;cluster
+    rm -f "${err}"
     submitted+=("${jid}")
     echo "submitted ${file} as job ${jid}${dep:+ (after ${dep})}"
 

@@ -266,6 +266,27 @@ else
 fi
 rm -rf "${MKLDIR}"
 
+# ------------------------------------------------------- 7c. sbatch job-id parsing
+# Real failure on Mill 2026-11-14: `sbatch --parsable` is documented to print
+# just the job id, but Mill's wrapper also prints banner lines ("Requested a
+# total of 4 CPU(s)", a requeue-preemption warning, ...). The driver captured
+# the whole blob as the job id and the next stage's
+# --dependency=afterok:<blob> was rejected, breaking the chain after stage 20.
+SBDIR="$(mktemp -d)"
+{ printf '#!/usr/bin/env bash\n'
+  printf 'echo "sbatch: Warning, you are submitting a job the to the requeue partition."\n'
+  printf 'echo "sbatch: Requested a total of 4 CPU(s)"\n'
+  printf 'echo "sbatch: GPUs requested: 1 x V100-SXM2-32GB (GPU Type)"\n'
+  printf 'echo 2746971\n'; } >"${SBDIR}/sbatch"
+chmod +x "${SBDIR}/sbatch"
+sb_out="$(PATH="${SBDIR}:$PATH" FS_SKIP_PREFLIGHT=1 FS_HOME_BASE="${SBDIR}/home" \
+          bash "${REPO}/hpc/run_pipeline.sh" submit 2>&1 || true)"
+check "sbatch banner lines do not become the job id" \
+      "$(printf '%s\n' "${sb_out}" | grep -c 'as job 2746971\b')" "4"
+check "every stage after the first chains on a bare job id" \
+      "$(printf '%s\n' "${sb_out}" | grep -c '(after 2746971)$')" "3"
+rm -rf "${SBDIR}"
+
 # ------------------------------------------------------- 8. torn ledger line survives
 printf '{"event":"stage_start","stage":"tr' >>"$LEDGER"
 printf '\n' >>"$LEDGER"
