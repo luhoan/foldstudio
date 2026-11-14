@@ -410,6 +410,59 @@ class TestSimulatedRun(unittest.TestCase):
         self.assertEqual(set(exp["metrics"]) & set(exp["metrics_unavailable"]), set())
 
 
+class TestDriverStageDoesNotPoisonStatus(unittest.TestCase):
+    """The driver writes a stage_start when it submits. It used to write no
+    stage_end, because submitting is all it does -- and the ledger reads a
+    stage_start with no stage_end as "the job died without running its exit
+    handler". export_bundle folds every stage error into the bundle, so on the
+    Mill a run whose three real stages all succeeded would have been exported
+    as status 'partial' carrying that invented cause of death.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="fs-drv-")
+        self.work = os.path.join(self.tmp, "run")
+        for sub in ("backbones", "seqs", "pred", "provenance"):
+            os.makedirs(os.path.join(self.work, sub), exist_ok=True)
+        self.events = os.path.join(self.work, "provenance", "events.jsonl")
+        shutil.copy2(BACKBONE, os.path.join(self.work, "backbones", "design_0.pdb"))
+        shutil.copy2(MPNN_FA, os.path.join(self.work, "seqs", "design_0.fa"))
+        shutil.copy2(BACKBONE, os.path.join(self.work, "pred", "design_0_s1.pdb"))
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _build(self, driver_ends):
+        ledger.append(self.events, {"run_id": "R", "stage": "driver",
+                                    "event": "stage_start", "host": "login"})
+        if driver_ends:
+            ledger.append(self.events, {"run_id": "R", "stage": "driver",
+                                        "event": "stage_end", "exit": 0})
+        for st, out in (("rfdiffusion", "backbones/design_0.pdb"),
+                        ("proteinmpnn", "seqs/design_0.fa"),
+                        ("predict", "pred/design_0_s1.pdb")):
+            ledger.append(self.events, {"run_id": "R", "stage": st,
+                                        "event": "stage_start", "host": "n1"})
+            ledger.append(self.events, {"run_id": "R", "stage": st, "event": "stage_end",
+                                        "exit": 0, "wall_seconds": 9.0, "outputs": [out]})
+        data = os.path.join(self.tmp, "data" + str(driver_ends))
+        _, exp, _ = eb.build(Args(data_dir=data, experiment_id="drv",
+                                  work_dir=self.work))
+        return exp
+
+    def test_driver_without_stage_end_would_downgrade_a_good_run(self):
+        exp = self._build(driver_ends=False)
+        self.assertEqual(exp["status"], "partial",
+                         "guard is meaningless if a driver with no stage_end is already harmless")
+        self.assertIn("died", (exp.get("error") or ""))
+
+    def test_driver_that_records_its_end_leaves_status_ok(self):
+        exp = self._build(driver_ends=True)
+        self.assertEqual(exp["status"], "ok",
+                         f"all three stages succeeded and every file exists: {exp.get('error')}")
+        self.assertIsNone(exp.get("error"))
+
+
 class TestWorkflowBlock(unittest.TestCase):
     """The `workflow` block drives Stream 5's WorkflowStepper. It must never show
     a greener state than the experiment record justifies."""

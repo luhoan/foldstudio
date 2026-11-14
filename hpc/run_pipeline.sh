@@ -226,6 +226,13 @@ PY
   done
 
   fs_event note --kv message="driver submitted ${#submitted[@]} jobs: ${submitted[*]}"
+
+  # The driver's work is submitting, and it is now done. Without this stage_end
+  # the ledger reads the missing one as "the job died without running its exit
+  # handler", and export_bundle.py folds that phantom error into the bundle --
+  # downgrading a wholly successful run from "ok" to "partial".
+  fs_event stage_end --kv host="$(hostname)" --json-kv exit=0 \
+    --json-kv outputs="$(fs_json_array "${submitted[@]}")"
   echo
   echo "watch it with:   bash hpc/run_pipeline.sh status"
   echo "cancel it with:  scancel ${submitted[*]}"
