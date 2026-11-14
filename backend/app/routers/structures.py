@@ -1,5 +1,3 @@
-import json
-import uuid
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -16,10 +14,6 @@ from app.services.structure_store import store as _store_impl
 router = APIRouter(prefix="/structures", tags=["structures"])
 
 Source = Literal["experimental", "predicted", "uploaded"]
-
-
-def _new_id() -> str:
-    return f"st_{uuid.uuid4().hex[:10]}"
 
 
 def _store(ctx, *, data: bytes, fmt: str, label: str, source: str, origin_id, provenance: dict, pae: Optional[bytes] = None, fixed_path: Optional[Path] = None) -> dict:
@@ -84,9 +78,13 @@ def fetch(body: FetchBody, ctx=Depends(get_ctx)):
             origin_id=res["origin_id"], provenance=res["provenance"], pae=pae,
         )
     except AppError as e:
-        if pae is not None and e.detail.startswith("invalid_pae"):
-            # Structure is fine; an unreadable PAE file must not block the import.
-            res["provenance"]["notes"] += " PAE file was downloaded but could not be parsed, so it was not stored."
+        if pae is not None and e.detail.startswith(("invalid_pae", "pae_mismatch")):
+            # Structure is fine; an unreadable or mismatched PAE file must not block the import.
+            res["provenance"]["notes"] += (
+                " PAE file was downloaded but could not be parsed, so it was not stored."
+                if e.detail.startswith("invalid_pae") else
+                " PAE file was downloaded but its size does not match this structure's residue "
+                "count, so it was not stored.")
             return _store(ctx, data=res["data"], fmt=res["format"], label=body.label or res["origin_id"],
                           source="predicted", origin_id=res["origin_id"], provenance=res["provenance"])
         raise

@@ -118,30 +118,71 @@ def compare(ctx, ids: list[str]) -> dict:
     }
 
 
+BUNDLE_KEY = "bundle"
+
+
+def _bundle_backed(ctx) -> dict[str, str]:
+    """{experiment id: bundle directory name} for records that were loaded from disk."""
+    out = {}
+    with db(ctx) as c:
+        for row in c.execute("SELECT id, body FROM experiments").fetchall():
+            try:
+                marker = json.loads(row["body"]).get(BUNDLE_KEY)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(marker, dict) and isinstance(marker.get("dir"), str):
+                out[row["id"]] = marker["dir"]
+    return out
+
+
 def reindex(ctx) -> dict:
-    """Load <data>/experiments/<dir>/experiment.json bundles (from the data and HPC streams)."""
-    imported, errors, registered = [], [], []
+    """Make the registry agree with <data>/experiments/<dir>/experiment.json.
+
+    Every bundle on disk is (re)loaded and the structures it lists are
+    registered or refreshed. A record that was loaded from a bundle is removed
+    again once that bundle is no longer on disk, together with the structure
+    rows it registered: the data directory is the source of truth for bundles,
+    so deleting one must not leave a ghost in the app. Records created through
+    POST /experiments carry no bundle marker and are never touched.
+    """
+    imported, errors, registered, updated, removed = [], [], [], [], []
+    seen_dirs = set()
     for d in sorted(p for p in ctx.experiments_dir.iterdir() if p.is_dir()):
         f = d / "experiment.json"
         if not f.exists():
             continue
+        seen_dirs.add(d.name)
         try:
             payload = json.loads(f.read_text())
             if not isinstance(payload, dict):
                 raise AppError(422, "invalid_experiment: top level must be a JSON object")
             payload.setdefault("id", d.name)
+            payload[BUNDLE_KEY] = {"dir": d.name, "path": f"experiments/{d.name}"}
             saved = save(ctx, payload, overwrite=True)
             imported.append(saved["id"])
             # Register the structures this bundle lists, so the API-driven
             # panels have something to show. Idempotent, and never fatal: a bad
             # output must not stop the experiment itself from being indexed.
-            reg = structure_store.register_experiment_outputs(ctx, saved)
+            reg = structure_store.register_experiment_outputs(ctx, saved, bundle_dir=d)
             registered.extend(reg["registered"])
+            updated.extend(reg["updated"])
             for err in reg["errors"]:
                 errors.append({"path": f"{d.name}/{err['path']}", "error": err["error"]})
         except AppError as e:
             errors.append({"path": str(f.relative_to(ctx.data_dir)), "error": e.detail})
         except Exception as e:
             errors.append({"path": str(f.relative_to(ctx.data_dir)), "error": f"{type(e).__name__}: {e}"})
-    return {"imported": imported, "errors": errors,
-            "structures_registered": registered}
+
+    # A bundle that failed to load this time is still on disk, so it is in
+    # seen_dirs and its earlier record (if any) is kept rather than pruned.
+    for exp_id, dirname in _bundle_backed(ctx).items():
+        if dirname in seen_dirs:
+            continue
+        with db(ctx) as c:
+            c.execute("DELETE FROM experiments WHERE id=?", (exp_id,))
+        structure_store.forget_experiment_structures(ctx, exp_id)
+        removed.append(exp_id)
+
+    return {"at": now_iso(), "imported": imported, "errors": errors,
+            "structures_registered": registered, "structures_updated": updated,
+            "removed": removed}

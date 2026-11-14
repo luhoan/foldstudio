@@ -1,3 +1,4 @@
+import logging
 import os
 
 from fastapi import FastAPI, Request
@@ -12,6 +13,11 @@ from app.jobs.base import RunnerRegistry
 from app.jobs.runners import PrecomputedRunner
 from app.routers import analysis, experiments, explain, jobs, reports, structures
 from app.services import experiments as exp_svc
+
+
+# uvicorn configures "uvicorn.error" with a console handler; logging through it
+# means these lines show up in the terminal that runs ./run.sh.
+log = logging.getLogger("uvicorn.error")
 
 
 def create_app(data_dir=None) -> FastAPI:
@@ -47,7 +53,20 @@ def create_app(data_dir=None) -> FastAPI:
 
     @app.get("/api/health")
     def health():
-        return {"status": "ok", "data_dir": str(ctx.data_dir), "runners": app.state.runners.names()}
+        return {"status": "ok", "data_dir": str(ctx.data_dir), "runners": app.state.runners.names(),
+                "reindex": app.state.last_reindex}
 
-    exp_svc.reindex(ctx)  # pick up bundles under data/experiments/*/experiment.json
+    # Pick up bundles under data/experiments/*/experiment.json. The outcome is
+    # kept and served from /api/health, and problems are logged: a bundle that
+    # fails to load is otherwise just absent from the app with nothing to say why.
+    app.state.last_reindex = exp_svc.reindex(ctx)
+    _log_reindex(app.state.last_reindex)
     return app
+
+
+def _log_reindex(report: dict) -> None:
+    log.info("indexed %d experiment bundle(s); registered %d and refreshed %d structure(s); removed %d",
+             len(report["imported"]), len(report["structures_registered"]),
+             len(report["structures_updated"]), len(report["removed"]))
+    for err in report["errors"]:
+        log.warning("bundle problem: %s: %s", err.get("path"), err.get("error"))

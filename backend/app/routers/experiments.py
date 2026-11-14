@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Request
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.deps import get_ctx
@@ -35,8 +35,10 @@ def compare(body: CompareBody, ctx=Depends(get_ctx)):
 
 
 @router.post("/reindex")
-def reindex(ctx=Depends(get_ctx)):
-    return svc.reindex(ctx)
+def reindex(request: Request, ctx=Depends(get_ctx)):
+    report = svc.reindex(ctx)
+    request.app.state.last_reindex = report  # what /api/health reports
+    return report
 
 
 @router.get("/{exp_id}")
