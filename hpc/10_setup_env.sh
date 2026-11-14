@@ -118,6 +118,22 @@ do_rfd_env() {
     fs_mark_done se3_installed "conda env ${FS_RFD_ENV}"
   fi
 
+  # SE3Transformer labels its maths with NVIDIA's NVTX profiling API, imported
+  # straight from torch.cuda.nvtx. A torch build without NVTX imports the name
+  # fine and only raises when it is called, so this surfaces as a crash partway
+  # into the first design rather than at install time. The labels are
+  # instrumentation; the patch falls back to a no-op and keeps the real one
+  # where NVTX works. Idempotent, and run on every rfd-env so an environment
+  # built before this existed is repaired too.
+  fs_activate_env "${FS_RFD_ENV}"
+  se3_pkg="$(python3 -c 'import os, se3_transformer; print(os.path.dirname(se3_transformer.__file__))' 2>/dev/null || true)"
+  if [ -n "${se3_pkg}" ]; then
+    fs_run patch_se3_nvtx python3 "${HERE}/patch_se3_nvtx.py" "${se3_pkg}" \
+      || fs_log "WARNING: could not apply the NVTX patch; stage 20 may fail on a torch build without NVTX"
+  else
+    fs_log "WARNING: se3_transformer not importable, skipping the NVTX patch"
+  fi
+
   fs_activate_env "${FS_RFD_ENV}"
   fs_collect_versions
   # Import check, not a GPU check: login nodes have no GPU, so a False here is expected.

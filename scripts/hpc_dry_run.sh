@@ -91,6 +91,16 @@ else
   FAILED=1
 fi
 
+echo "  environment patches (SE3Transformer NVTX fallback)"
+if python3 "${REPO}/hpc/tests/test_nvtx_patch.py" >/tmp/hpc_nvtx_tests.log 2>&1; then
+  grep -E '^(Ran|OK)' /tmp/hpc_nvtx_tests.log | sed 's/^/    /'
+else
+  echo "    FAILED -- failures and errors:"
+  grep -E '^(FAIL|ERROR|AssertionError)' /tmp/hpc_nvtx_tests.log | sed 's/^/      /' || true
+  echo "    (full log: /tmp/hpc_nvtx_tests.log)"
+  FAILED=1
+fi
+
 echo
 echo "[4/5] building a demo bundle from the real fixtures"
 EXTRA=()
