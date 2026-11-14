@@ -179,7 +179,36 @@ if [ -n "$(field "$LEDGER" demo_preempt error)" ]; then
   ok "unfinished stage carries an explanatory error"
 else bad "unfinished stage has no error text"; fi
 
-# ------------------------------------------------------- 5. torn ledger line survives
+# ------------------------------------------- 5. fs_stage_finish records exactly one end
+# Every stage script ends with fs_stage_finish, so a double stage_end here would
+# corrupt the wall-time and exit-status of every run.
+cat >"${TMP}/s_finish.sh" <<'EOS'
+set -euo pipefail
+. "${TMP_ENV}"
+. "${FS_REPO}/hpc/env.sh"
+. "${FS_REPO}/hpc/lib/common.sh"
+fs_stage_begin demo_finish
+fs_run noop true
+fs_stage_finish '["backbones/design_0.pdb","backbones/design_1.pdb"]'
+EOS
+rc=$(TMP_ENV="${TMP}/stage_env.sh" run_stage "${TMP}/s_finish.sh")
+check "finished stage exits 0" "$rc" "0"
+check "exactly one stage_end" "$(count_ev "$LEDGER" demo_finish stage_end)" "1"
+check "finished stage completed" "$(field "$LEDGER" demo_finish completed)" "True"
+check "outputs recorded" "$(field "$LEDGER" demo_finish outputs)" '["backbones/design_0.pdb", "backbones/design_1.pdb"]'
+
+# ---------------------------------------------- 6. ledger pretty renders on this python
+# This rendering used to be inline python with backslashes inside f-strings,
+# which is a syntax error before python 3.12. Keep it exercised.
+if python3 "${REPO}/hpc/lib/ledger.py" pretty --file "$LEDGER" >"${TMP}/pretty.txt" 2>&1; then
+  ok "ledger pretty runs"
+  if grep -q 'PREEMPTED x1' "${TMP}/pretty.txt"; then ok "pretty reports the preemption"; else bad "pretty lost the preemption"; fi
+  if grep -q 'demo_fail' "${TMP}/pretty.txt"; then ok "pretty lists the failed stage"; else bad "pretty omitted the failed stage"; fi
+else
+  bad "ledger pretty failed: $(cat "${TMP}/pretty.txt")"
+fi
+
+# ------------------------------------------------------- 7. torn ledger line survives
 printf '{"event":"stage_start","stage":"tr' >>"$LEDGER"
 printf '\n' >>"$LEDGER"
 check "torn line ignored, ledger still readable" "$(count_ev "$LEDGER" demo_ok cmd)" "2"

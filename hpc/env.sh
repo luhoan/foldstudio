@@ -126,6 +126,24 @@ export TORCH_HOME="${FS_TORCH_HOME}"
 [ -f "${_FS_ENV_DIR}/env.local.sh" ] && . "${_FS_ENV_DIR}/env.local.sh"
 
 # ------------------------------------------------------------------- helpers
+# fs_set_run_id <RUN_ID>
+# Point every derived path at a different run. Needed by the driver's
+# status/resume/export commands, which take a run id on the command line after
+# this file has already computed paths from the default.
+fs_set_run_id() {
+  FS_RUN_ID="$1"
+  FS_WORK="${FS_RUNS_DIR}/${FS_RUN_ID}"
+  FS_SCRATCH="${FS_SCRATCH_BASE}/${FS_RUN_ID}"
+  FS_BACKBONES="${FS_WORK}/backbones"
+  FS_SEQS="${FS_WORK}/seqs"
+  FS_PRED="${FS_WORK}/pred"
+  FS_PROV="${FS_WORK}/provenance"
+  FS_LOGS="${FS_WORK}/logs"
+  FS_CKPT="${FS_WORK}/checkpoints"
+  FS_EVENTS="${FS_PROV}/events.jsonl"
+  export FS_RUN_ID FS_WORK FS_SCRATCH FS_BACKBONES FS_SEQS FS_PRED FS_PROV FS_LOGS FS_CKPT FS_EVENTS
+}
+
 fs_mkdirs() {
   mkdir -p "${FS_BACKBONES}" "${FS_SEQS}" "${FS_PRED}" "${FS_PROV}" "${FS_LOGS}" "${FS_CKPT}"
 }

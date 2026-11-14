@@ -1,0 +1,8 @@
+# Local, machine-specific overrides sourced by env.sh. Never commit these:
+# they hold cluster accounts and absolute paths that differ per user.
+env.local.sh
+
+# Byproducts of running the scripts from inside hpc/
+*.out
+__pycache__/
+*.pyc

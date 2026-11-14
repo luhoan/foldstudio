@@ -243,9 +243,40 @@ def _kv_pairs(pairs: list[str] | None, as_json: bool) -> dict:
     return out
 
 
+def pretty(path: str) -> str:
+    """Human-readable per-stage summary (used by hpc/run_pipeline.sh status)."""
+    d = summarize(path)
+    lines = [f"events: {d['event_count']}  run_ids: {', '.join(d['run_ids']) or '-'}"]
+    if not d["stages"]:
+        lines.append("  (no stages have recorded anything yet)")
+    for name, s in d["stages"].items():
+        bits = [
+            "ran" if s["ran"] else "NEVER RAN",
+            "completed" if s["completed"] else "not completed",
+            f"exit={s['exit_status']}",
+        ]
+        if s["attempts"] > 1:
+            bits.append(f"attempts={s['attempts']}")
+        if s["preemptions"]:
+            bits.append(f"PREEMPTED x{s['preemptions']}")
+        if s["wall_seconds"] is not None:
+            bits.append(f"wall={s['wall_seconds']}s")
+        if s["items_done"]:
+            bits.append(f"items_done={len(s['items_done'])}")
+        if s["hosts"]:
+            bits.append(f"hosts={','.join(s['hosts'])}")
+        lines.append(f"  {name:22s} " + "  ".join(bits))
+        if s["error"]:
+            lines.append(f"      error: {s['error']}")
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="append-only provenance ledger")
     sub = p.add_subparsers(dest="cmd", required=True)
+
+    pp = sub.add_parser("pretty", help="human-readable per-stage summary")
+    pp.add_argument("--file", required=True)
 
     a = sub.add_parser("append", help="append one event")
     a.add_argument("--file", required=True)
@@ -272,6 +303,10 @@ def main(argv: list[str] | None = None) -> int:
         except ValueError as exc:
             print(f"ledger: {exc}", file=sys.stderr)
             return 2
+        return 0
+
+    if args.cmd == "pretty":
+        print(pretty(args.file))
         return 0
 
     if args.cmd == "summary":
