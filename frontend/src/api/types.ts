@@ -100,19 +100,29 @@ export interface ExplanationResponse {
 }
 
 export interface CompareRequest {
-  experiment_ids: string[]
+  /** The backend's canonical field. It also accepts `experiment_ids` as an
+   *  alias, because this client shipped with that name. */
+  ids: string[]
+}
+
+/** A field, setting or metric across the compared experiments.
+ *  `values` is keyed by experiment id; `differs` is computed by the backend. */
+export interface CompareRow {
+  field: string
+  values: Record<string, unknown>
+  differs: boolean
 }
 
 export interface CompareResponse {
-  experiments: Array<{
-    experiment_id: string
-    model_name?: string
-    kind?: ExperimentKind
-    status?: ExperimentStatus
-    metrics: Record<string, number | string | null>
-  }>
-  metrics?: Record<string, Array<number | string | null>>
+  ids: string[]
+  /** Full experiment records, in the order requested. Keyed by `id`. */
+  experiments: Experiment[]
+  fields: CompareRow[]
+  settings: CompareRow[]
+  metrics: CompareRow[]
+  note: string
 }
+
 
 export interface ReportResponse {
   html?: string

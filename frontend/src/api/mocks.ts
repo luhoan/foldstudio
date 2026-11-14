@@ -93,11 +93,16 @@ export const demoAlignment: AlignmentResponse = {
 }
 
 export const demoComparison: CompareResponse = {
-  experiments: [{
-    experiment_id: demoExperiment.id,
-    model_name: demoExperiment.model_name,
-    kind: 'demo',
-    status: 'partial',
-    metrics: demoExperiment.metrics,
-  }],
+  ids: [demoExperiment.id],
+  experiments: [demoExperiment],
+  fields: [
+    { field: 'kind', values: { [demoExperiment.id]: demoExperiment.kind }, differs: false },
+    { field: 'status', values: { [demoExperiment.id]: demoExperiment.status }, differs: false },
+    { field: 'model_name', values: { [demoExperiment.id]: demoExperiment.model_name }, differs: false },
+  ],
+  settings: [],
+  metrics: Object.entries(demoExperiment.metrics).map(([field, v]) => ({
+    field, values: { [demoExperiment.id]: v }, differs: false,
+  })),
+  note: 'Demo fixture: a single experiment, so nothing differs.',
 }

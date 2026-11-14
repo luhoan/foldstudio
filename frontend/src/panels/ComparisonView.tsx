@@ -34,7 +34,7 @@ export function ComparisonView() {
     try {
       const [a, c] = await Promise.all([
         alignStructures({ mobile_id: mobileId, reference_id: referenceId, selection: {} }),
-        compareExperiments({ experiment_ids: [mobileExperiment, referenceExperiment] }),
+        compareExperiments({ ids: [mobileExperiment, referenceExperiment] }),
       ])
       setAlignment(a); setComparison(c)
     } catch (e) {
@@ -42,7 +42,10 @@ export function ComparisonView() {
     } finally { setLoading(false) }
   }
 
-  const metricRows = comparison?.experiments ?? []
+  const compared = comparison?.experiments ?? []
+  // The backend already works out which rows differ; show those first.
+  const rows = [...(comparison?.fields ?? []), ...(comparison?.settings ?? []), ...(comparison?.metrics ?? [])]
+  const differing = rows.filter((r) => r.differs)
   return (
     <section className="space-y-4 rounded-lg border border-border bg-card p-4">
       <header><h2 className="text-base font-semibold">Structure & experiment comparison</h2>
@@ -88,13 +91,24 @@ export function ComparisonView() {
           Alignment used {alignment.aligned_atoms} {alignment.atom_type} atoms across {alignment.aligned_residues} residues. The matrix is the backend-provided 4×4 transform.
         </p>
       </div>}
-      {metricRows.length > 0 && <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs"><thead><tr><th className="p-2">Experiment</th><th className="p-2">Model</th><th className="p-2">Kind</th><th className="p-2">Status</th><th className="p-2">Metrics</th></tr></thead>
-          <tbody>{metricRows.map((row) => <tr key={row.experiment_id} className="border-t border-border">
-            <td className="p-2 font-mono">{row.experiment_id}</td><td className="p-2">{row.model_name ?? '—'}</td>
-            <td className="p-2">{row.kind ?? '—'}</td><td className="p-2">{row.status ?? '—'}</td>
-            <td className="p-2">{Object.entries(row.metrics).map(([k, v]) => `${k}: ${v ?? '—'}`).join(' · ')}</td>
-          </tr>)}</tbody></table>
+      {compared.length > 0 && <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs">
+          <thead><tr><th className="p-2">Field</th>{compared.map((e) => <th key={e.id} className="p-2 font-mono">{e.id}</th>)}</tr></thead>
+          <tbody>{(differing.length ? differing : rows).map((row) => (
+            <tr key={row.field} className={row.differs ? 'border-t border-border bg-primary/5' : 'border-t border-border'}>
+              <td className="p-2 font-medium">{row.field}</td>
+              {compared.map((e) => {
+                const v = row.values[e.id]
+                return <td key={e.id} className="p-2 font-mono">{v === null || v === undefined ? '—' : String(v)}</td>
+              })}
+            </tr>
+          ))}</tbody>
+        </table>
+        <p className="mt-3 text-xs text-muted-foreground">
+          {differing.length
+            ? `Showing the ${differing.length} field(s) that differ, highlighted. ${comparison?.note ?? ''}`
+            : `No field differs between these experiments. ${comparison?.note ?? ''}`}
+        </p>
       </div>}
     </section>
   )

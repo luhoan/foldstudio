@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
 from fastapi import APIRouter, Body, Depends
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.deps import get_ctx
 from app.services import experiments as svc
@@ -20,7 +20,13 @@ def create_experiment(payload: dict[str, Any] = Body(...), ctx=Depends(get_ctx))
 
 
 class CompareBody(BaseModel):
-    ids: list[str]
+    """`ids` is canonical. `experiment_ids` is accepted because the frontend
+    shipped with that name and docs/CONTRACT.MD named the endpoint without
+    naming its body, so neither side was wrong and both were in use."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    ids: list[str] = Field(validation_alias=AliasChoices("ids", "experiment_ids"))
 
 
 @router.post("/compare")
