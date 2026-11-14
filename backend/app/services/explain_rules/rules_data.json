@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "disclaimer": "Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation.",
+  "plddt_bins": [
+    {"id": "very_high", "min": 90, "max": 100, "label": "very high local model confidence",
+     "text": "pLDDT {value:.1f} (90-100): very high local model confidence. This is the model's own estimate of local accuracy for a predicted structure; it is not an experimental observation."},
+    {"id": "high", "min": 70, "max": 90, "label": "relatively high local model confidence",
+     "text": "pLDDT {value:.1f} (70-90): relatively high local model confidence. This describes the model's estimate of local backbone accuracy, not experimentally observed folding or function."},
+    {"id": "low", "min": 50, "max": 70, "label": "low local model confidence",
+     "text": "pLDDT {value:.1f} (50-70): low local model confidence. Treat the local geometry as uncertain."},
+    {"id": "very_low", "min": 0, "max": 50, "label": "very low local model confidence",
+     "text": "pLDDT {value:.1f} (below 50): very low local model confidence. Low values can occur in regions the model could not place reliably, including flexible or disordered regions, so this value alone does not say which."}
+  ],
+  "templates": {
+    "plddt_region": "Residues {start}-{end} of chain {chain} ({n} residues): mean pLDDT {mean:.1f}. Fraction of residues by bin: {bin_summary}. These are model confidence values from a predicted structure.",
+    "pae_region": "Predicted aligned error (PAE) for residues {start}-{end} of chain {chain}: mean {mean:.1f} A, maximum {max:.1f} A across {n_pairs} residue pairs. PAE is the model's estimate of the expected position error of one residue when the structure is aligned on another, so it is a relative uncertainty between residue pairs. Lower values mean lower predicted relative uncertainty.",
+    "pae_interchain": "Mean PAE between chain {chain_a} and chain {chain_b}: {mean:.1f} A over {n_pairs} residue pairs. This is the model's relative uncertainty about how the two chains are positioned with respect to each other.",
+    "rmsd": "Root-mean-square deviation (RMSD) {rmsd:.2f} A, computed on {aligned_atoms} {atom_type} atoms from {aligned_residues} aligned residues (mobile: {mobile}, reference: {reference}). RMSD measures average positional difference over only those atoms, and is sensitive to outlier regions and to which atoms were selected.",
+    "rmsd_small_n": "Only {aligned_atoms} atoms were aligned, so this RMSD describes a very small part of the structure.",
+    "tm_score": "TM-score {tm:.3f}. TM-score is a length-normalised structural similarity measure between 0 and 1; higher means greater similarity of the aligned backbones. It does not describe function.",
+    "tm_missing": "No TM-score was reported for this alignment.",
+    "exp_vs_pred": "Comparison of an experimental structure ({exp_id}) with a predicted model ({pred_id}). The experimental structure is derived from measured data for the deposited sample; the predicted model is a computational estimate. A low RMSD or high TM-score indicates the two coordinate sets are similar over the aligned atoms. It does not by itself indicate that either structure is correct for other conditions or states.",
+    "exp_vs_pred_plddt": "Mean pLDDT of the predicted model over the compared residues was {mean:.1f}.",
+    "interface": "Interface between chain {chain_a} and chain {chain_b} in {structure}: {n_contacts} residue pairs with heavy atoms within {cutoff:.1f} A. Mean pLDDT of interface residues is {iface_plddt:.1f}. Mean inter-chain PAE is {iface_pae:.1f} A. These numbers describe model confidence in the relative placement of the chains in the coordinates; they are not measurements of any physical property.",
+    "interface_experimental": "Interface between chain {chain_a} and chain {chain_b} in experimental entry {structure}: {n_contacts} residue pairs with heavy atoms within {cutoff:.1f} A, computed from the deposited coordinates. No model-confidence scores apply to experimental coordinates."
+  }
+}
