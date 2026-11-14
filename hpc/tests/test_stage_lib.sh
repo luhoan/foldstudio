@@ -301,6 +301,27 @@ check "an explicit run id still wins" \
       "$(printf '%s\n' "${st_out}" | sed -n 's/^run_id *//p' | head -1)" "20261113T090000Z"
 rm -rf "${STDIR}"
 
+# ------------------------------------------------------- 7e. running is not dead
+# Mill 2026-11-14: status printed "the job died without running its exit
+# handler" about fs-rfd while squeue, six lines above, showed it RUNNING. A
+# stage_start with no stage_end looks the same for both; only Slurm can tell.
+LVDIR="$(mktemp -d)"
+mkdir -p "${LVDIR}/runs/20261114T115930Z/provenance" "${LVDIR}/bin"
+printf '%s\n' '{"ts":1,"run_id":"r","stage":"rfdiffusion","event":"stage_start","host":"n1"}' \
+  >"${LVDIR}/runs/20261114T115930Z/provenance/events.jsonl"
+{ printf '#!/usr/bin/env bash\n'
+  printf 'case "$*" in *RUNNING*) [ -n "${FAKE_RUNNING:-}" ] && echo "${FAKE_RUNNING}";; esac\nexit 0\n'; } >"${LVDIR}/bin/squeue"
+chmod +x "${LVDIR}/bin/squeue"
+lv_out="$(PATH="${LVDIR}/bin:$PATH" FAKE_RUNNING=fs-rfd FS_HOME_BASE="${LVDIR}" bash "${REPO}/hpc/run_pipeline.sh" status 2>&1 || true)"
+check "a stage Slurm reports as running is shown as running" \
+      "$(printf '%s\n' "${lv_out}" | grep -c 'RUNNING NOW')" "1"
+check "and is not given an error line" \
+      "$(printf '%s\n' "${lv_out}" | grep -c 'error:')" "0"
+lv_out="$(PATH="${LVDIR}/bin:$PATH" FS_HOME_BASE="${LVDIR}" bash "${REPO}/hpc/run_pipeline.sh" status 2>&1 || true)"
+check "the same ledger with no live job still reports the missing stage_end" \
+      "$(printf '%s\n' "${lv_out}" | grep -c 'no stage_end')" "1"
+rm -rf "${LVDIR}"
+
 # ------------------------------------------------------- 8. torn ledger line survives
 printf '{"event":"stage_start","stage":"tr' >>"$LEDGER"
 printf '\n' >>"$LEDGER"

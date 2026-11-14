@@ -81,6 +81,19 @@ STAGES=(
   "50_export.sbatch|fs-export|cpu"
 )
 
+# Slurm job name -> the stage name that script writes into the ledger, so
+# `status` can tell a stage that is running from one that died. The ledger
+# cannot know the difference; only the scheduler can.
+fs_stage_for_jobname() {
+  case "$1" in
+    fs-rfd)    echo "rfdiffusion" ;;
+    fs-mpnn)   echo "proteinmpnn" ;;
+    fs-pred)   echo "predict_${FS_PREDICTOR}" ;;
+    fs-export) echo "export_bundle" ;;
+    *)         echo "" ;;
+  esac
+}
+
 need_sbatch() {
   command -v sbatch >/dev/null 2>&1 \
     || fs_die "sbatch is not on PATH. Run this on a Mill login node, or use 'dry-run' to check the bundle format offline."
@@ -270,7 +283,16 @@ do_status() {
     echo "--- ledger summary ---"
     # Rendering lives in ledger.py: inline python here would need backslashes
     # inside f-strings, which is a syntax error before python 3.12.
-    python3 "${FS_LEDGER_PY}" pretty --file "${FS_EVENTS}"
+    # Tell the renderer which stages Slurm says are live right now.
+    running_args=()
+    if command -v squeue >/dev/null 2>&1; then
+      while read -r jname; do
+        [ -n "${jname}" ] || continue
+        sname="$(fs_stage_for_jobname "${jname}")"
+        [ -n "${sname}" ] && running_args+=(--running "${sname}")
+      done < <(squeue -u "${FS_USER}" -h -t RUNNING -o '%j' 2>/dev/null || true)
+    fi
+    python3 "${FS_LEDGER_PY}" pretty --file "${FS_EVENTS}" ${running_args+"${running_args[@]}"}
   else
     echo "no ledger yet at ${FS_EVENTS} (nothing has started)"
   fi

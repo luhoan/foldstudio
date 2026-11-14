@@ -184,18 +184,23 @@ def stage_summary(events: Iterable[dict], stage: str) -> dict:
         s["wall_seconds"] = round(wall_total, 3)
     s["completed"] = s["exit_status"] == 0
 
-    # A stage that started, never ended, and was never preempted died hard. Say so
-    # instead of leaving a silent gap -- but do not invent a cause.
-    if s["ran"] and s["ended_at"] is None and s["error"] is None:
+    # A stage that started and never ended is unfinished. Whether it is still
+    # running or died is not in the ledger -- only the scheduler knows that --
+    # so record the fact and let the caller say which. `status` cross-checks
+    # squeue; export_bundle runs after the jobs are gone, where unfinished does
+    # mean died.
+    s["unfinished"] = bool(s["ran"] and s["ended_at"] is None)
+    if s["unfinished"] and s["error"] is None:
         if s["preemptions"]:
             s["error"] = (
-                f"stage was preempted {s['preemptions']}x and never recorded a stage_end; "
-                "the last attempt did not finish"
+                f"stage was preempted {s['preemptions']}x and recorded no stage_end since: "
+                "the last attempt is still running, or it did not finish"
             )
         else:
             s["error"] = (
-                "stage recorded a stage_start but no stage_end: the job died without "
-                "running its exit handler (out of time, OOM-killed, or node failure)"
+                "stage recorded a stage_start but no stage_end: it is either still "
+                "running, or it died without running its exit handler (out of time, "
+                "OOM-killed, or node failure)"
             )
     return s
 
@@ -243,18 +248,26 @@ def _kv_pairs(pairs: list[str] | None, as_json: bool) -> dict:
     return out
 
 
-def pretty(path: str) -> str:
-    """Human-readable per-stage summary (used by hpc/run_pipeline.sh status)."""
+def pretty(path: str, running: Iterable[str] = ()) -> str:
+    """Human-readable per-stage summary (used by hpc/run_pipeline.sh status).
+
+    `running` names stages the scheduler currently reports as live. Without it
+    an in-flight stage is indistinguishable from a dead one, and reporting a
+    healthy running job as dead is worse than saying nothing.
+    """
+    live = {r for r in running}
     d = summarize(path)
     lines = [f"events: {d['event_count']}  run_ids: {', '.join(d['run_ids']) or '-'}"]
     if not d["stages"]:
         lines.append("  (no stages have recorded anything yet)")
     for name, s in d["stages"].items():
+        is_live = name in live and s.get("unfinished")
         bits = [
             "ran" if s["ran"] else "NEVER RAN",
-            "completed" if s["completed"] else "not completed",
-            f"exit={s['exit_status']}",
+            "RUNNING NOW" if is_live else ("completed" if s["completed"] else "not completed"),
         ]
+        if not is_live:
+            bits.append(f"exit={s['exit_status']}")
         if s["attempts"] > 1:
             bits.append(f"attempts={s['attempts']}")
         if s["preemptions"]:
@@ -266,8 +279,10 @@ def pretty(path: str) -> str:
         if s["hosts"]:
             bits.append(f"hosts={','.join(s['hosts'])}")
         lines.append(f"  {name:22s} " + "  ".join(bits))
-        if s["error"]:
+        if s["error"] and not is_live:
             lines.append(f"      error: {s['error']}")
+        elif is_live:
+            lines.append("      (no stage_end yet -- expected, the scheduler says this job is running)")
     return "\n".join(lines)
 
 
@@ -276,6 +291,8 @@ def main(argv: list[str] | None = None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     pp = sub.add_parser("pretty", help="human-readable per-stage summary")
+    pp.add_argument("--running", action="append", default=[],
+                    help="stage the scheduler reports as live; repeatable")
     pp.add_argument("--file", required=True)
 
     a = sub.add_parser("append", help="append one event")
@@ -306,7 +323,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "pretty":
-        print(pretty(args.file))
+        print(pretty(args.file, args.running))
         return 0
 
     if args.cmd == "summary":
