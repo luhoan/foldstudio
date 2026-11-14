@@ -182,6 +182,65 @@ def mean_ca_b(path: str) -> float | None:
     return round(sum(vals) / len(vals), 2) if vals else None
 
 
+def _kabsch_rmsd_pure(P: list, Q: list) -> float:
+    """Minimum RMSD after optimal rigid superposition, with no numpy.
+
+    Horn's closed form: the best rotation corresponds to the largest eigenvalue
+    lam of a symmetric 4x4 matrix built from the covariance of the centred
+    coordinate sets, and  rmsd^2 = (sum|p|^2 + sum|q|^2 - 2*lam) / n.
+    The eigenvalue comes from cyclic Jacobi rotations. The tests compare this
+    against the numpy SVD route on random sets, rigid transforms and mirror
+    images, unrounded, to 1e-6 A.
+    """
+    n = len(P)
+    cp = [sum(p[i] for p in P) / n for i in range(3)]
+    cq = [sum(q[i] for q in Q) / n for i in range(3)]
+    P = [(p[0] - cp[0], p[1] - cp[1], p[2] - cp[2]) for p in P]
+    Q = [(q[0] - cq[0], q[1] - cq[1], q[2] - cq[2]) for q in Q]
+    S = [[sum(p[i] * q[j] for p, q in zip(P, Q)) for j in range(3)] for i in range(3)]
+    (sxx, sxy, sxz), (syx, syy, syz), (szx, szy, szz) = S
+    N = [
+        [sxx + syy + szz, syz - szy, szx - sxz, sxy - syx],
+        [syz - szy, sxx - syy - szz, sxy + syx, szx + sxz],
+        [szx - sxz, sxy + syx, -sxx + syy - szz, syz + szy],
+        [sxy - syx, szx + sxz, syz + szy, -sxx - syy + szz],
+    ]
+    for _sweep in range(100):
+        off = sum(N[i][j] ** 2 for i in range(4) for j in range(4) if i != j)
+        if off < 1e-22:
+            break
+        for i in range(3):
+            for j in range(i + 1, 4):
+                if abs(N[i][j]) < 1e-300:
+                    continue
+                theta = (N[j][j] - N[i][i]) / (2.0 * N[i][j])
+                t = (1.0 if theta >= 0 else -1.0) / (abs(theta) + (theta * theta + 1.0) ** 0.5)
+                c = 1.0 / (t * t + 1.0) ** 0.5
+                sn = t * c
+                for k in range(4):
+                    nik, njk = N[i][k], N[j][k]
+                    N[i][k], N[j][k] = c * nik - sn * njk, sn * nik + c * njk
+                for k in range(4):
+                    nki, nkj = N[k][i], N[k][j]
+                    N[k][i], N[k][j] = c * nki - sn * nkj, sn * nki + c * nkj
+    lam = max(N[i][i] for i in range(4))
+    e0 = sum(x * x + y * y + z * z for x, y, z in P) + sum(x * x + y * y + z * z for x, y, z in Q)
+    return (max(0.0, (e0 - 2.0 * lam) / n)) ** 0.5
+
+
+def _kabsch_rmsd_numpy(np, P: list, Q: list) -> float:
+    """Minimum RMSD after optimal rigid superposition (Kabsch, via SVD)."""
+    P = np.array(P, dtype=float)
+    Q = np.array(Q, dtype=float)
+    P = P - P.mean(axis=0)
+    Q = Q - Q.mean(axis=0)
+    V, _S, Wt = np.linalg.svd(P.T @ Q)
+    d = np.sign(np.linalg.det(V @ Wt))
+    U = V @ np.diag([1.0, 1.0, d]) @ Wt
+    diff = (P @ U) - Q
+    return float(np.sqrt((diff * diff).sum() / len(P)))
+
+
 def kabsch_ca_rmsd(a: list, b: list) -> dict:
     """Optimal-superposition CA RMSD between two equal-length CA lists.
 
@@ -199,21 +258,20 @@ def kabsch_ca_rmsd(a: list, b: list) -> dict:
     try:
         import numpy as np
     except ImportError:
-        return {"rmsd": None, "aligned_atoms": 0, "atom_type": "CA",
-                "reason": "numpy is not importable in this environment, so no RMSD was computed"}
+        # The export stage runs wherever python3 happens to be (on the Mill, a
+        # bare system interpreter with no numpy), and this is the pipeline's
+        # headline number, so compute it without numpy rather than drop it.
+        rmsd = _kabsch_rmsd_pure([(x, y, z) for (_c, _r, _i, x, y, z) in a],
+                                 [(x, y, z) for (_c, _r, _i, x, y, z) in b])
+        return {"rmsd": round(rmsd, 3), "aligned_atoms": len(a), "aligned_residues": len(a),
+                "atom_type": "CA", "reason": None,
+                "method": "optimal superposition, Horn quaternion method (pure Python; numpy absent)"}
 
-    P = np.array([[x, y, z] for (_c, _r, _i, x, y, z) in a], dtype=float)
-    Q = np.array([[x, y, z] for (_c, _r, _i, x, y, z) in b], dtype=float)
-    P = P - P.mean(axis=0)
-    Q = Q - Q.mean(axis=0)
-    V, S, Wt = np.linalg.svd(P.T @ Q)
-    d = np.sign(np.linalg.det(V @ Wt))
-    D = np.diag([1.0, 1.0, d])
-    U = V @ D @ Wt
-    diff = (P @ U) - Q
-    rmsd = float(np.sqrt((diff * diff).sum() / len(P)))
-    return {"rmsd": round(rmsd, 3), "aligned_atoms": len(P), "aligned_residues": len(P),
-            "atom_type": "CA", "reason": None}
+    rmsd = _kabsch_rmsd_numpy(np, [(x, y, z) for (_c, _r, _i, x, y, z) in a],
+                              [(x, y, z) for (_c, _r, _i, x, y, z) in b])
+    return {"rmsd": round(rmsd, 3), "aligned_atoms": len(a), "aligned_residues": len(a),
+            "atom_type": "CA", "reason": None,
+            "method": "optimal superposition, Kabsch algorithm (numpy SVD)"}
 
 
 # ------------------------------------------------------- ProteinMPNN FASTA parsing
@@ -488,10 +546,43 @@ def build(args) -> tuple[Bundle, dict, dict]:
             name = os.path.splitext(os.path.basename(p))[0]
             entry: dict = {"name": name, "file": rel, "n_residues": info["n_residues"]}
 
-            # pLDDT: only if the B-factor column can be pLDDT at all.
+            # ProteinMPNN writes the INPUT sequence as record 0 of its FASTA, and
+            # for an RFdiffusion backbone that input is a placeholder (poly-Gly),
+            # not a design. If the predictor folded it anyway, keep the file --
+            # it is a real output -- but never pool it with the designs: its
+            # pLDDT and RMSD would drag the design metrics around for no reason.
+            input_rec = input_record_for(name, mpnn_files, side)
+            is_input = input_rec is not None
+            if is_input:
+                seq = input_rec.get("sequence") or ""
+                poly_g = bool(seq) and seq.count("G") >= 0.9 * len(seq)
+                entry["role"] = "input_sequence"
+                entry["note"] = (
+                    "Prediction of the sequence ProteinMPNN echoes as record 0 -- its INPUT, not a "
+                    "design" + (". Here that input is a poly-glycine placeholder, because an "
+                                "RFdiffusion backbone has no sequence of its own" if poly_g else "")
+                    + ". Kept because the predictor really produced it; excluded from every "
+                    "aggregate metric.")
+            else:
+                entry["role"] = "design"
+
+            # pLDDT: only if the B-factor column can be pLDDT at all. The value
+            # reported is measured from the PDB the app will display; the
+            # predictor's own figure is kept beside it as corroboration.
             mp = None
-            if side and isinstance(side.get("mean_plddt"), (int, float)):
-                mp = float(side["mean_plddt"])
+            side_mp = side.get("mean_plddt") if side else None
+            if info["b_looks_like_plddt"] and side:
+                mp = mean_ca_b(p)
+                entry["mean_plddt_source"] = "mean CA B-factor of the predicted PDB (written by the predictor)"
+                if isinstance(side_mp, (int, float)):
+                    entry["mean_plddt_reported_by_predictor"] = float(side_mp)
+                    if mp is not None and abs(float(side_mp) - mp) > 1.0:
+                        entry["mean_plddt_note"] = (
+                            "the predictor's own mean_plddt differs from the CA mean of the file by more "
+                            "than 1; it may average over all atoms or use a different scale. The file-derived "
+                            "value is the one reported.")
+            elif side and isinstance(side_mp, (int, float)):
+                mp = float(side_mp)
                 entry["mean_plddt_source"] = "predictor sidecar (<name>.pred.json)"
             elif info["b_looks_like_plddt"]:
                 mp = mean_ca_b(p)
@@ -504,11 +595,13 @@ def build(args) -> tuple[Bundle, dict, dict]:
                     f"unavailable: B-factor range {info['b_min']}-{info['b_max']} is outside "
                     "0-100, so it cannot be pLDDT and was not reported as such")
             if mp is not None:
-                plddts.append(mp)
                 entry["mean_plddt"] = mp
+                if not is_input:
+                    plddts.append(mp)
             if side and isinstance(side.get("ptm"), (int, float)):
-                ptms.append(float(side["ptm"]))
                 entry["ptm"] = float(side["ptm"])
+                if not is_input:
+                    ptms.append(float(side["ptm"]))
 
             pae = pae_for(p)
             entry["pae_file"] = b.copy_in(pae, "structures") if pae else None
@@ -521,13 +614,14 @@ def build(args) -> tuple[Bundle, dict, dict]:
                 res = kabsch_ca_rmsd(bb_info[bb]["ca"], info["ca"])
                 res["backbone"] = bb
                 entry["scrmsd"] = res
-                if res["rmsd"] is not None:
+                if res["rmsd"] is not None and not is_input:
                     rmsds.append(res["rmsd"])
 
             # predicted models DO carry pLDDT, so these register as "predicted"
             reg_body = {
                 "path": f"{exp_id}/{os.path.basename(p)}",
-                "label": f"{name} (predicted structure)",
+                "label": (f"{name} (prediction of ProteinMPNN's input record, not a design)"
+                          if is_input else f"{name} (predicted structure)"),
                 "source": "predicted",
                 "origin_id": f"{exp_id}:{os.path.basename(p)}",
                 "notes": ((side or {}).get("plddt_units") or "pLDDT read from the B-factor column.")
@@ -593,10 +687,16 @@ def build(args) -> tuple[Bundle, dict, dict]:
         kind = "demo"
     else:
         # "executed" needs BOTH a ledger that says a stage ran AND files on disk.
-        ran_any = any(s.get("ran") for s in stages.values())
+        ran_any = any(s.get("ran") for name, s in stages.items() if is_science_stage(name))
         kind = "executed" if (ran_any and (produced_backbones or produced_seqs or produced_preds)) else "imported"
 
-    errors = [s["error"] for s in stages.values() if s.get("error")]
+    # Only the stages that produce the experiment decide its status. The driver
+    # and the exporter are bookkeeping around it -- and the exporter reads this
+    # ledger from INSIDE its own stage, after its stage_start and before its
+    # stage_end, so counting it would make every run it exports "partial" with
+    # a missing-stage_end error about itself.
+    errors = [s["error"] for name, s in stages.items()
+              if s.get("error") and is_science_stage(name)]
     expected_all = produced_backbones and produced_seqs and produced_preds
     if dry:
         status = "ok" if (produced_backbones and produced_seqs) else "failed"
@@ -875,6 +975,34 @@ def workflow_block(stages: dict, kind: str, produced: dict, metrics: dict,
         row["status_label"] = STATUS_LABELS.get(row["status"], row["status"])
         rows.append(row)
     return rows
+
+
+def input_record_for(pred_name: str, mpnn_files: dict, sidecar: dict | None) -> dict | None:
+    """Return ProteinMPNN's echoed input record if `pred_name` is a fold of it.
+
+    Predictions are named <fasta stem>_s<record index>. Record 0 of a ProteinMPNN
+    FASTA carries no `sample=` field: it is the input sequence, written back out
+    for reference. Two independent signals are accepted, because a prediction can
+    arrive without a sidecar (off-cluster runs) or without its FASTA:
+      * the FASTA in this bundle says record <index> is the input record;
+      * the predictor's sidecar kept the source header, and it has no sample=.
+    """
+    m = re.match(r"^(?P<stem>.+)_s(?P<i>\d+)$", pred_name)
+    if not m:
+        return None
+    idx = int(m.group("i"))
+    parsed = mpnn_files.get(m.group("stem") + ".fa")
+    if parsed and parsed.get("input") is not None and parsed["input"]["index"] == idx:
+        return parsed["input"]
+    header = (sidecar or {}).get("source_fasta_header")
+    if idx == 0 and isinstance(header, str) and header and "sample=" not in header:
+        return {"index": 0, "header": header, "sequence": (sidecar or {}).get("sequence") or ""}
+    return None
+
+
+def is_science_stage(name: str) -> bool:
+    """True for stages whose outcome is the experiment's outcome."""
+    return not (name == "driver" or name.startswith(("export", "setup", "weights")))
 
 
 def match_backbone(pred_name: str, bb_info: dict) -> str | None:

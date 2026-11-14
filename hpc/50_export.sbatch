@@ -86,11 +86,13 @@ PY
 
 cat <<EOF
 
-Copy the bundle to your machine and import it:
+Copy the bundle to your machine and import it (from the repo root there):
 
-    rsync -av ${FS_USER}@<mill-login>:${TARBALL} .
-    tar xzf bundle_${EXP_ID}.tar.gz -C <repo>/data/experiments/
-    curl -X POST http://localhost:8000/api/experiments/reindex
-    # then make the register calls listed in the bundle's import_plan.json
+    scp ${FS_USER}@<mill-login-host>:${TARBALL} /tmp/
+    python3 scripts/hpc_import_bundle.py /tmp/bundle_${EXP_ID}.tar.gz
+
+The import script validates the bundle, places it under data/experiments/ and
+asks a running backend to index it; the backend registers the bundle's
+structures itself, so there are no further calls to make.
 EOF
 exit 0

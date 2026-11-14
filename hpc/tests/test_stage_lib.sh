@@ -287,6 +287,25 @@ check "every stage after the first chains on a bare job id" \
       "$(printf '%s\n' "${sb_out}" | grep -c '(after 2746971)$')" "3"
 rm -rf "${SBDIR}"
 
+# ------------------------------------------------------- 7c'. resume parses ids too
+# resume had its own copy of the submit loop, with the same banner bug.
+RSDIR="$(mktemp -d)"
+mkdir -p "${RSDIR}/bin" "${RSDIR}/home/runs/20261114T115930Z/backbones" "${RSDIR}/home/runs/20261114T115930Z/seqs"
+: >"${RSDIR}/home/runs/20261114T115930Z/backbones/design_0.pdb"
+: >"${RSDIR}/home/runs/20261114T115930Z/seqs/design_0.fa"
+{ printf '#!/usr/bin/env bash\n'
+  printf 'echo "sbatch: Warning, you are submitting a job the to the requeue partition."\n'
+  printf 'echo "sbatch: Requested a total of 4 CPU(s)"\n'
+  printf 'echo 2750001\n'; } >"${RSDIR}/bin/sbatch"
+chmod +x "${RSDIR}/bin/sbatch"
+rs_out="$(PATH="${RSDIR}/bin:$PATH" FS_SKIP_PREFLIGHT=1 FS_NUM_DESIGNS=1 FS_HOME_BASE="${RSDIR}/home" \
+          bash "${REPO}/hpc/run_pipeline.sh" resume 20261114T115930Z 2>&1 || true)"
+check "resume resubmits only the unfinished stages (predict + export)" \
+      "$(printf '%s\n' "${rs_out}" | grep -c '^resubmitted ')" "2"
+check "resume chains on a bare job id" \
+      "$(printf '%s\n' "${rs_out}" | grep -c 'as job 2750001 (after 2750001)$')" "1"
+rm -rf "${RSDIR}"
+
 # ------------------------------------------------------- 7d. status finds the live run
 # `status` with no run id used to mint a fresh UTC timestamp, so running it
 # seconds after `submit` reported on a directory that never existed and said

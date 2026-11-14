@@ -94,6 +94,25 @@ fs_stage_for_jobname() {
   esac
 }
 
+# fs_sbatch_jobid <sbatch argv...> -- submit, print ONLY the job id on stdout.
+# Mill's sbatch prints banner lines around the id that --parsable emits (a
+# requeue-preemption warning, "Requested a total of 4 CPU(s)", ...), so the id
+# is the last bare "<jobid>" or "<jobid>;<cluster>" line. On failure, prints
+# everything sbatch said to stderr and returns non-zero.
+fs_sbatch_jobid() {
+  local raw err rc=0 jid
+  err="$(mktemp)"
+  raw="$("$@" 2>"${err}")" || rc=$?
+  jid="$(printf '%s\n' "${raw}" | sed -n 's/^\([0-9][0-9]*\)\(;.*\)\?$/\1/p' | tail -1)"
+  if [ "${rc}" -ne 0 ] || [ -z "${jid}" ]; then
+    { printf '%s\n' "${raw}"; cat "${err}"; } >&2
+    rm -f "${err}"
+    return 1
+  fi
+  rm -f "${err}"
+  printf '%s\n' "${jid}"
+}
+
 need_sbatch() {
   command -v sbatch >/dev/null 2>&1 \
     || fs_die "sbatch is not on PATH. Run this on a Mill login node, or use 'dry-run' to check the bundle format offline."
@@ -205,25 +224,17 @@ PY
     IFS='|' read -r file logname kind <<<"${row}"
     mapfile -t cmd < <(build_cmd "${file}" "${logname}" "${kind}" "${dep}")
 
-    # Mill's sbatch prints banner lines ("sbatch: Requested a total of 4 CPU(s)",
-    # a requeue-preemption warning, ...) around the id that --parsable emits, so
-    # the output cannot be used as the job id wholesale: keep stderr separate and
-    # take the last bare "<jobid>" or "<jobid>;<cluster>" line from stdout.
-    local jid rc=0 raw err
-    err="$(mktemp)"
-    raw="$("${cmd[@]}" 2>"${err}")" || rc=$?
-    jid="$(printf '%s\n' "${raw}" | sed -n 's/^\([0-9][0-9]*\)\(;.*\)\?$/\1/p' | tail -1)"
-    if [ "${rc}" -ne 0 ] || [ -z "${jid}" ]; then
-      raw="${raw}$(printf '\n--- stderr ---\n')$(cat "${err}")"
-      rm -f "${err}"
-      jid="${raw}"
+    local jid rc=0 errtxt
+    errtxt="$(mktemp)"
+    jid="$(fs_sbatch_jobid "${cmd[@]}" 2>"${errtxt}")" || rc=$?
+    if [ "${rc}" -ne 0 ]; then
       fs_event cmd --kv name="submit_${logname}" --kv host="$(hostname)" \
-        --json-kv argv="$(fs_json_array "${cmd[@]}")" --json-kv exit="${rc:-1}" \
-        --kv error="sbatch output: ${jid}"
-      fs_die "sbatch failed for ${file}: ${jid}
+        --json-kv argv="$(fs_json_array "${cmd[@]}")" --json-kv exit="${rc}" \
+        --kv error="sbatch output: $(cat "${errtxt}")"
+      fs_die "sbatch failed for ${file}: $(cat "${errtxt}")
 Already-submitted jobs: ${submitted[*]:-none}. Cancel them with: scancel ${submitted[*]:-}"
     fi
-    rm -f "${err}"
+    rm -f "${errtxt}"
     submitted+=("${jid}")
     echo "submitted ${file} as job ${jid}${dep:+ (after ${dep})}"
 
@@ -328,10 +339,8 @@ Pass the run id:  bash hpc/run_pipeline.sh resume <RUN_ID>"
   for row in "${todo[@]}"; do
     IFS='|' read -r file logname kind <<<"${row}"
     mapfile -t cmd < <(build_cmd "${file}" "${logname}" "${kind}" "${dep}")
-    local jid rc=0
-    jid="$("${cmd[@]}" 2>&1)" || rc=$?
-    [ "${rc}" -eq 0 ] && [ -n "${jid//[!0-9]/}" ] || fs_die "sbatch failed for ${file}: ${jid}"
-    jid="${jid%%;*}"
+    local jid
+    jid="$(fs_sbatch_jobid "${cmd[@]}")" || fs_die "sbatch failed for ${file} (sbatch's output is above)"
     echo "resubmitted ${file} as job ${jid}${dep:+ (after ${dep})}"
     fs_event cmd --kv name="resubmit_${logname}" --kv host="$(hostname)" \
       --json-kv argv="$(fs_json_array "${cmd[@]}")" --json-kv exit=0
@@ -341,7 +350,27 @@ Pass the run id:  bash hpc/run_pipeline.sh resume <RUN_ID>"
 
 do_export() {
   [ -d "${FS_WORK}" ] || fs_die "no such run directory: ${FS_WORK}"
-  python3 "${HERE}/export_bundle.py" --work-dir "${FS_WORK}" --data-dir "${FS_REPO}/data" "$@"
+  local exp_id="${FS_EXPERIMENT_ID:-hpc_${FS_RUN_ID}}" data_dir="${FS_EXPORT_DATA_DIR:-${FS_REPO}/data}"
+  # An explicit --experiment-id on the command line wins, and the tarball below
+  # has to be named after whichever id the exporter actually used.
+  local prev="" arg
+  for arg in "$@"; do
+    case "${arg}" in --experiment-id=*) exp_id="${arg#--experiment-id=}" ;; esac
+    [ "${prev}" = "--experiment-id" ] && exp_id="${arg}"
+    prev="${arg}"
+  done
+  python3 "${HERE}/export_bundle.py" --work-dir "${FS_WORK}" --data-dir "${data_dir}" \
+    --experiment-id "${exp_id}" "$@"
+  # Same tarball the export stage makes, so a re-export on a login node leaves
+  # one obvious file to copy off the cluster.
+  local tarball="${FS_WORK}/bundle_${exp_id}.tar.gz"
+  if tar czf "${tarball}" -C "${data_dir}/experiments" "${exp_id}" 2>/dev/null; then
+    echo
+    echo "tarball: ${tarball}"
+    echo "on your own machine, from the repo root:"
+    echo "  scp ${FS_USER}@<mill-login-host>:${tarball} /tmp/"
+    echo "  python3 scripts/hpc_import_bundle.py /tmp/$(basename "${tarball}")"
+  fi
 }
 
 do_dry_run() {

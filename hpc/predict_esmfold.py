@@ -127,6 +127,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max-sequences", type=int, default=0, help="0 = no limit")
     ap.add_argument("--skip-existing", action="store_true",
                     help="leave finished outputs alone (used for resume)")
+    ap.add_argument("--include-input-record", action="store_true",
+                    help="also fold ProteinMPNN's record 0 (the echoed input sequence, a poly-Gly "
+                         "placeholder for an RFdiffusion backbone). Off by default: it is not a design.")
     ap.add_argument("--list-only", action="store_true",
                     help="parse inputs and print what would be predicted; loads no model")
     args = ap.parse_args(argv)
@@ -134,12 +137,20 @@ def main(argv: list[str] | None = None) -> int:
     os.makedirs(args.out_dir, exist_ok=True)
 
     # Collect (name, sequence). ProteinMPNN writes the native/input sequence as
-    # the FIRST record and its designs after it; every record is predicted and
-    # the header is kept verbatim in the sidecar so they stay distinguishable.
+    # the FIRST record and its designs after it. Designs are predicted; the
+    # echoed input is skipped unless asked for (see --include-input-record).
     jobs: list[tuple[str, str, str]] = []
     for fa in args.fasta:
         stem = os.path.splitext(os.path.basename(fa))[0]
-        for i, (header, seq) in enumerate(read_fasta(fa)):
+        records = read_fasta(fa)
+        has_designs = any("sample=" in h for h, _ in records)
+        for i, (header, seq) in enumerate(records):
+            # Indices are kept as-is (designs stay _s1, _s2, ...) so names do not
+            # shift depending on whether the input record was folded.
+            if (i == 0 and has_designs and "sample=" not in header
+                    and not args.include_input_record):
+                print(f"skip {stem}_s0: ProteinMPNN's echoed input sequence, not a design")
+                continue
             name = f"{args.prefix}{stem}_s{i}"
             jobs.append((name, seq, header))
     if args.max_sequences:

@@ -410,17 +410,19 @@ class TestSimulatedRun(unittest.TestCase):
         self.assertEqual(set(exp["metrics"]) & set(exp["metrics_unavailable"]), set())
 
 
-class TestDriverStageDoesNotPoisonStatus(unittest.TestCase):
-    """The driver writes a stage_start when it submits. It used to write no
-    stage_end, because submitting is all it does -- and the ledger reads a
-    stage_start with no stage_end as "the job died without running its exit
-    handler". export_bundle folds every stage error into the bundle, so on the
-    Mill a run whose three real stages all succeeded would have been exported
-    as status 'partial' carrying that invented cause of death.
+class TestBookkeepingStagesDoNotDecideStatus(unittest.TestCase):
+    """Only stages that produce the experiment decide its status.
+
+    Two real cases from the Mill. The driver opened a stage and (at first) never
+    closed it. And the exporter reads the ledger from inside its own stage --
+    after its stage_start, before its stage_end -- so it always sees itself as
+    unfinished. Either would have turned a wholly successful run into "partial"
+    carrying a missing-stage_end error. A science stage that is unfinished must
+    still do exactly that.
     """
 
     def setUp(self):
-        self.tmp = tempfile.mkdtemp(prefix="fs-drv-")
+        self.tmp = tempfile.mkdtemp(prefix="fs-book-")
         self.work = os.path.join(self.tmp, "run")
         for sub in ("backbones", "seqs", "pred", "provenance"):
             os.makedirs(os.path.join(self.work, sub), exist_ok=True)
@@ -432,35 +434,181 @@ class TestDriverStageDoesNotPoisonStatus(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def _build(self, driver_ends):
-        ledger.append(self.events, {"run_id": "R", "stage": "driver",
-                                    "event": "stage_start", "host": "login"})
-        if driver_ends:
-            ledger.append(self.events, {"run_id": "R", "stage": "driver",
-                                        "event": "stage_end", "exit": 0})
-        for st, out in (("rfdiffusion", "backbones/design_0.pdb"),
-                        ("proteinmpnn", "seqs/design_0.fa"),
-                        ("predict", "pred/design_0_s1.pdb")):
-            ledger.append(self.events, {"run_id": "R", "stage": st,
-                                        "event": "stage_start", "host": "n1"})
-            ledger.append(self.events, {"run_id": "R", "stage": st, "event": "stage_end",
-                                        "exit": 0, "wall_seconds": 9.0, "outputs": [out]})
-        data = os.path.join(self.tmp, "data" + str(driver_ends))
-        _, exp, _ = eb.build(Args(data_dir=data, experiment_id="drv",
-                                  work_dir=self.work))
+    def start(self, stage):
+        ledger.append(self.events, {"run_id": "R", "stage": stage, "event": "stage_start", "host": "n"})
+
+    def end(self, stage, code=0, **kw):
+        ledger.append(self.events, {"run_id": "R", "stage": stage, "event": "stage_end",
+                                    "exit": code, "wall_seconds": 9.0, **kw})
+
+    def science_ok(self, skip=()):
+        for st in ("rfdiffusion", "proteinmpnn", "predict_esmfold"):
+            if st not in skip:
+                self.start(st)
+                self.end(st)
+
+    def build(self):
+        _, exp, _ = eb.build(Args(data_dir=os.path.join(self.tmp, "data"),
+                                  experiment_id="book", work_dir=self.work))
         return exp
 
-    def test_driver_without_stage_end_would_downgrade_a_good_run(self):
-        exp = self._build(driver_ends=False)
-        self.assertEqual(exp["status"], "partial",
-                         "guard is meaningless if a driver with no stage_end is already harmless")
-        self.assertIn("died", (exp.get("error") or ""))
+    def test_unclosed_driver_stage_is_harmless(self):
+        self.start("driver")
+        self.science_ok()
+        exp = self.build()
+        self.assertEqual(exp["status"], "ok", exp.get("error"))
 
-    def test_driver_that_records_its_end_leaves_status_ok(self):
-        exp = self._build(driver_ends=True)
-        self.assertEqual(exp["status"], "ok",
-                         f"all three stages succeeded and every file exists: {exp.get('error')}")
+    def test_exporter_seeing_itself_mid_flight_is_harmless(self):
+        self.science_ok()
+        self.start("export_bundle")
+        exp = self.build()
+        self.assertEqual(exp["status"], "ok", exp.get("error"))
         self.assertIsNone(exp.get("error"))
+
+    def test_an_earlier_failed_export_attempt_is_not_the_experiments_failure(self):
+        self.science_ok()
+        self.start("export_bundle")
+        self.end("export_bundle", code=1, error="disk quota")
+        self.start("export_bundle")
+        self.assertEqual(self.build()["status"], "ok")
+
+    def test_unfinished_science_stage_still_makes_the_run_partial(self):
+        self.science_ok(skip=("predict_esmfold",))
+        self.start("predict_esmfold")
+        exp = self.build()
+        self.assertEqual(exp["status"], "partial")
+        self.assertIn("no stage_end", exp["error"])
+
+    def test_a_stage_that_failed_then_succeeded_on_retry_is_ok(self):
+        self.start("rfdiffusion")
+        self.end("rfdiffusion", code=1, error="NVTX functions not installed")
+        self.science_ok()
+        exp = self.build()
+        self.assertEqual(exp["status"], "ok", exp.get("error"))
+
+    def test_driver_alone_does_not_make_a_run_executed(self):
+        """Files on disk plus nothing but bookkeeping in the ledger is not a run."""
+        self.start("driver")
+        self.end("driver")
+        self.assertNotEqual(self.build()["kind"], "executed")
+
+
+class TestMillShapedRun(unittest.TestCase):
+    """The layout the first real Mill run produced: one backbone, one MPNN FASTA
+    (echoed input record + one design), and a predictor that folded BOTH records.
+    Files are the real fixtures standing in for stage outputs; the point is the
+    bookkeeping, not the coordinates.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="fs-mill-")
+        self.work = os.path.join(self.tmp, "run")
+        for sub in ("backbones", "seqs", "pred", "provenance"):
+            os.makedirs(os.path.join(self.work, sub))
+        shutil.copy2(BACKBONE, os.path.join(self.work, "backbones", "design_0.pdb"))
+        shutil.copy2(MPNN_FA, os.path.join(self.work, "seqs", "design_0.fa"))
+        headers = [h for h, _ in eb.read_fasta(MPNN_FA)]
+        for i, plddt in ((0, 31.0), (1, 88.0)):
+            pdb = os.path.join(self.work, "pred", f"design_0_s{i}.pdb")
+            shutil.copy2(BACKBONE, pdb)
+            with open(pdb[:-4] + ".pred.json", "w") as fh:
+                json.dump({"name": f"design_0_s{i}", "source_fasta_header": headers[i],
+                           "mean_plddt": plddt, "ptm": 0.2 + 0.5 * i,
+                           "plddt_units": "model wrote 0-100 already; left unchanged"}, fh)
+        events = os.path.join(self.work, "provenance", "events.jsonl")
+        for st in ("driver", "rfdiffusion", "proteinmpnn", "predict_esmfold"):
+            ledger.append(events, {"run_id": "R", "stage": st, "event": "stage_start", "host": "n"})
+            ledger.append(events, {"run_id": "R", "stage": st, "event": "stage_end", "exit": 0,
+                                   "wall_seconds": 5.0})
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def build(self):
+        b, exp, run = eb.build(Args(data_dir=os.path.join(self.tmp, "data"),
+                                    experiment_id="mill", work_dir=self.work))
+        return b, exp
+
+    def test_run_is_executed_and_ok(self):
+        _, exp = self.build()
+        self.assertEqual((exp["kind"], exp["status"]), ("executed", "ok"), exp.get("error"))
+
+    def test_input_record_prediction_is_kept_but_labelled(self):
+        b, _ = self.build()
+        roles = {d["name"]: d["role"] for d in b.per_design}
+        self.assertEqual(roles, {"design_0_s0": "input_sequence", "design_0_s1": "design"})
+
+    def test_input_record_never_reaches_an_aggregate(self):
+        """ptm 0.2 belongs to the echoed input, 0.7 to the design. A mean of the
+        two (0.45) would mean the placeholder leaked into a design metric."""
+        b, _ = self.build()
+        self.assertEqual(b.metrics["predicted_mean_ptm"], 0.7)
+        design = next(d for d in b.per_design if d["role"] == "design")
+        self.assertEqual(b.metrics["predicted_mean_plddt"], design["mean_plddt"])
+        self.assertEqual(b.metrics["predicted_best_mean_plddt"], design["mean_plddt"])
+
+    def test_input_record_is_recognised_from_the_fasta_when_there_is_no_sidecar(self):
+        """Off-cluster predictions can arrive without <name>.pred.json."""
+        for i in (0, 1):
+            os.remove(os.path.join(self.work, "pred", f"design_0_s{i}.pred.json"))
+        b, _ = self.build()
+        roles = {d["name"]: d["role"] for d in b.per_design}
+        self.assertEqual(roles, {"design_0_s0": "input_sequence", "design_0_s1": "design"})
+
+    def test_structure_sources_cover_every_registered_file(self):
+        _, exp = self.build()
+        self.assertEqual(exp["structure_sources"],
+                         {"design_0.pdb": "uploaded", "design_0_s0.pdb": "predicted",
+                          "design_0_s1.pdb": "predicted"})
+
+    def test_rmsd_survives_a_python_without_numpy(self):
+        """The export stage ran under a bare system python3 on the Mill."""
+        saved = sys.modules.get("numpy", "absent")
+        sys.modules["numpy"] = None  # makes `import numpy` raise ImportError
+        try:
+            b, _ = self.build()
+        finally:
+            if saved == "absent":
+                sys.modules.pop("numpy", None)
+            else:
+                sys.modules["numpy"] = saved
+        # prediction files are copies of the backbone, so the true answer is 0
+        self.assertEqual(b.metrics["self_consistency_ca_rmsd_best"], 0.0)
+        design = next(d for d in b.per_design if d["role"] == "design")
+        self.assertIn("pure Python", design["scrmsd"]["method"])
+
+
+class TestPureKabschAgreesWithNumpy(unittest.TestCase):
+    def test_random_sets_rotations_and_mirror_images(self):
+        import math
+        import random
+        import numpy as np
+        rng = random.Random(11)
+        for trial in range(120):
+            n = rng.randint(3, 90)
+            P = [(rng.gauss(0, 9), rng.gauss(0, 9), rng.gauss(0, 9)) for _ in range(n)]
+            a, c = rng.uniform(0, 6.28), rng.uniform(0, 6.28)
+            R = (np.array([[math.cos(a), -math.sin(a), 0], [math.sin(a), math.cos(a), 0], [0, 0, 1]])
+                 @ np.array([[math.cos(c), 0, math.sin(c)], [0, 1, 0], [-math.sin(c), 0, math.cos(c)]]))
+            noise = (0.0, 0.4, 4.0)[trial % 3]
+            Q = [tuple(float(v) + rng.gauss(0, noise) if noise else float(v)
+                       for v in (R @ np.array(p)) + np.array([4.0, -2.0, 7.0])) for p in P]
+            if trial % 5 == 0:  # a mirror image must not superpose to zero
+                Q = [(-x, y, z) for x, y, z in Q]
+            ref = eb._kabsch_rmsd_numpy(np, P, Q)
+            self.assertAlmostEqual(eb._kabsch_rmsd_pure(P, Q), ref, delta=1e-6)
+
+    def test_exact_copy_and_rigid_transform_are_zero(self):
+        P = [(0.0, 0.0, 0.0), (3.8, 0.0, 0.0), (5.0, 3.6, 0.0), (8.1, 4.0, 2.2), (9.0, 7.5, 3.1)]
+        self.assertAlmostEqual(eb._kabsch_rmsd_pure(P, list(P)), 0.0, places=9)
+        Q = [(-y + 10.0, x - 4.0, z + 2.5) for x, y, z in P]  # 90 degree turn + shift
+        self.assertAlmostEqual(eb._kabsch_rmsd_pure(P, Q), 0.0, places=7)
+
+    def test_degenerate_inputs_do_not_crash(self):
+        line = [(float(i), 0.0, 0.0) for i in range(6)]            # collinear
+        same = [(1.0, 1.0, 1.0)] * 6                               # all coincident
+        self.assertAlmostEqual(eb._kabsch_rmsd_pure(line, line), 0.0, places=9)
+        self.assertGreaterEqual(eb._kabsch_rmsd_pure(line, same), 0.0)
 
 
 class TestWorkflowBlock(unittest.TestCase):

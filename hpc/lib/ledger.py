@@ -113,6 +113,7 @@ def stage_summary(events: Iterable[dict], stage: str) -> dict:
         "wall_seconds": None,
         "exit_status": None,
         "error": None,
+        "earlier_errors": [],
         "commands": [],
         "items_done": [],
         "notes": [],
@@ -144,6 +145,15 @@ def stage_summary(events: Iterable[dict], stage: str) -> dict:
             s["attempts"] += 1
             if s["started_at"] is None:
                 s["started_at"] = e.get("ts")
+            # A new attempt supersedes the outcome of the one before it: until
+            # this attempt ends, the stage is in flight again. What the earlier
+            # attempt reported is history, kept under earlier_errors.
+            if s["ended_at"] is not None:
+                if s["error"]:
+                    s["earlier_errors"].append(s["error"])
+                s["ended_at"] = None
+                s["exit_status"] = None
+                s["error"] = None
         elif kind == "cmd":
             s["commands"].append(
                 {
@@ -172,6 +182,8 @@ def stage_summary(events: Iterable[dict], stage: str) -> dict:
             s["exit_status"] = e.get("exit")
             if e.get("error"):
                 s["error"] = e["error"]
+            elif e.get("exit") == 0:
+                s["error"] = None
             for o in e.get("outputs") or []:
                 if o not in s["outputs"]:
                     s["outputs"].append(o)
