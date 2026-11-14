@@ -89,12 +89,22 @@ class Pipeline(unittest.TestCase):
         self.assertEqual(e["metrics"]["interfaces"][0]["n_residue_pairs"], 2)
         self.assertIn("did not run any experiment or model", e["provenance"]["notes"])
         self.assertIn('"doi": "10.1/x"', e["provenance"]["notes"])  # only from entry metadata
+        # what the backend needs to register the structure under a readable name, with a source
+        out = e["outputs"][0]
+        self.assertEqual((out["type"], out["source"], out["path"]), ("structure", "experimental", "structures/6m0j.pdb"))
+        self.assertEqual(out["label"], m["label"])
+        # entry metadata is carried verbatim, and only what the entry actually returned
+        self.assertEqual(e["entry"]["title_from_entry"], "Crystal structure of ACE2 with spike RBD")
+        self.assertEqual(e["entry"]["chain_descriptions_from_entry"], {"A": "Entity one"})
+        self.assertEqual(e["entry"]["citation_from_entry"]["doi"], "10.1/x")
+        self.assertEqual(e["entry"]["origin_id"], "6M0J")
 
     def test_no_citation_means_none_written(self):
         self.use(rcsb_routes("1CRN", "Crambin", citation=False))
         F.run(self.data, {"crambin"})
         e = json.loads((self.data / "experiments/imported-1crn/experiment.json").read_text())
         self.assertNotIn("citation", e["provenance"]["notes"].lower())
+        self.assertNotIn("citation_from_entry", e["entry"])  # absent in the entry -> absent here
 
     def test_title_mismatch_is_dropped(self):
         self.use(rcsb_routes("1UBQ", "Something unrelated entirely"))
@@ -133,6 +143,7 @@ class Pipeline(unittest.TestCase):
         e = json.loads((self.data / "experiments/imported-af-p42212-f1/experiment.json").read_text())
         self.assertEqual(e["metrics"]["mean_plddt_ca"], 91.0)
         self.assertEqual([o["type"] for o in e["outputs"]], ["structure", "pae"])
+        self.assertEqual(e["outputs"][0]["source"], "predicted")
         self.assertEqual(e["model_version"], "4")
         self.assertEqual(rep["warnings"], {"af-p42212-f1": {"pae_warning": "PAE size 4 != n_residues 2"}})
 

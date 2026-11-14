@@ -299,15 +299,24 @@ def write_experiment(info: dict, extra: dict, data_dir: Path) -> Path:
     # "source" is read by the backend when it auto-registers this structure:
     # GET /structures/{id}/plddt reads B-factors as pLDDT for "predicted" only,
     # and a deposited entry's B-factors are a different quantity entirely.
+    # "label" is what the backend calls the structure when it registers it, so
+    # the app lists "Crambin" rather than "1crn.pdb (imported-1crn)".
     outputs = [{"type": "structure", "path": info["file"], "sha256": info["sha256"],
-                "source": "predicted" if predicted else "experimental"}]
+                "source": "predicted" if predicted else "experimental",
+                "label": info["label"]}]
     if info.get("pae"):
         outputs.append({"type": "pae", "path": info["pae"]["file"], "sha256": info["pae"]["sha256"]})
+    # What the entry says about itself, verbatim from its own metadata, for the
+    # app to show next to the structure. Only keys that were actually returned.
+    entry = {k: info[k] for k in ("label", "reason", "title_from_entry", "method_from_entry",
+                                  "chain_descriptions_from_entry", "citation_from_entry",
+                                  "selection_note", "database", "origin_id", "url") if info.get(k)}
     exp = {
         "id": eid, "created_at": info["retrieved_at"], "kind": "imported", "status": "ok",
         "model_name": "AlphaFold DB (precomputed)" if predicted else "none (experimental entry)",
         "model_version": str(info.get("model_version") or "n/a"),
         "settings": {}, "inputs": [info["id"]], "outputs": outputs, "metrics": metrics, "error": None,
+        "entry": entry,
         "provenance": {"source": f"{info['database']}:{info['origin_id']}", "retrieved_at": info["retrieved_at"],
                        "url": info["url"], "notes": " ".join(notes)},
     }

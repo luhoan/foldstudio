@@ -831,6 +831,12 @@ def build(args) -> tuple[Bundle, dict, dict]:
         # is "uploaded" and only a real prediction is "predicted".
         "structure_sources": {os.path.basename(r["body"]["path"]): r["body"]["source"]
                               for r in b.register if "source" in r.get("body", {})},
+        # What the app should call each of those structures (same register bodies).
+        "structure_labels": {os.path.basename(r["body"]["path"]): r["body"]["label"]
+                             for r in b.register if r.get("body", {}).get("label")},
+        # One sentence per reported metric saying what it is and how it was
+        # computed, so a number in the app or a report can carry its meaning.
+        "metric_definitions": dict(b.definitions),
         "metrics": dict(b.metrics),
         "error": error_text,
         "provenance": {
