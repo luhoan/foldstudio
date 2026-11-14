@@ -196,13 +196,57 @@ def match_by_resnum(M, R):
     return [(i, ref_index[(m["resseq"], m["icode"])]) for i, m in enumerate(M) if (m["resseq"], m["icode"]) in ref_index]
 
 
+# Below this identity, pairing residues by sequence alignment is not something to
+# rely on: the alignment is mostly placing gaps. A designed backbone is the
+# extreme case -- it is all glycine, so its "sequence" carries no information
+# about which residue corresponds to which.
+LOW_IDENTITY = 0.25
+MIN_PAIRS = 3
+METHODS = ("sequence", "resnum", "auto")
+
+
+def _with_ca(M, R, idx):
+    return [(i, j) for i, j in idx if M[i]["ca"] is not None and R[j]["ca"] is not None]
+
+
+def _identity(M, R, idx) -> float:
+    return sum(1 for i, j in idx if M[i]["aa"] == R[j]["aa"]) / len(idx) if idx else 0.0
+
+
+def choose_matching(M, R, requested: str):
+    """Return (pairs, method actually used, note-or-None).
+
+    "sequence" and "resnum" do exactly what they say. "auto" tries sequence
+    alignment first and keeps it when it pairs enough residues at a believable
+    identity; otherwise it pairs by residue number if that pairs at least as
+    many residues, and says that it did. It never switches silently.
+    """
+    if requested == "resnum":
+        return _with_ca(M, R, match_by_resnum(M, R)), "resnum", None
+    by_seq = _with_ca(M, R, match_by_sequence(M, R))
+    if requested == "sequence":
+        return by_seq, "sequence", None
+    ident = _identity(M, R, by_seq)
+    if len(by_seq) >= MIN_PAIRS and ident >= LOW_IDENTITY:
+        return by_seq, "sequence", None
+    by_num = _with_ca(M, R, match_by_resnum(M, R))
+    if len(by_num) >= MIN_PAIRS and len(by_num) >= len(by_seq):
+        return by_num, "resnum", (
+            f"Residue matching was chosen automatically: sequence alignment paired {len(by_seq)} "
+            f"residue(s) at {100 * ident:.0f}% identity, too little to rely on, so residues were "
+            f"paired by residue number instead ({len(by_num)} pairs). This assumes both structures "
+            "use the same residue numbering."
+        )
+    return by_seq, "sequence", None
+
+
 # ------------------------------------------------------------------ main entry
 
 def align(mobile_model, reference_model, sel: dict | None = None) -> dict:
     sel = sel or {}
-    method = sel.get("method") or "sequence"
-    if method not in ("sequence", "resnum"):
-        raise AppError(400, "invalid_selection: method must be 'sequence' or 'resnum'")
+    requested = sel.get("method") or "sequence"
+    if requested not in METHODS:
+        raise AppError(400, "invalid_selection: method must be 'sequence', 'resnum' or 'auto'")
     mc = sel.get("mobile_chain") or default_chain(mobile_model)
     rc = sel.get("reference_chain") or default_chain(reference_model)
     M = chain_residues(mobile_model, mc, sel.get("mobile_range"))
@@ -210,10 +254,18 @@ def align(mobile_model, reference_model, sel: dict | None = None) -> dict:
     if not M or not R:
         raise AppError(400, "invalid_selection: selected residue range is empty")
 
-    idx = match_by_sequence(M, R) if method == "sequence" else match_by_resnum(M, R)
-    idx = [(i, j) for i, j in idx if M[i]["ca"] is not None and R[j]["ca"] is not None]
-    if len(idx) < 3:
-        raise AppError(400, f"alignment_error: only {len(idx)} matched residues with CA atoms; need at least 3")
+    idx, method, auto_note = choose_matching(M, R, requested)
+    if len(idx) < MIN_PAIRS:
+        hint = {
+            "sequence": " Sequence alignment paired too few residues; if both structures share "
+                        "residue numbering, use selection.method='resnum' (or 'auto').",
+            "resnum": " Too few residue numbers are shared; if the sequences are related, use "
+                      "selection.method='sequence' (or 'auto').",
+            "auto": " Neither sequence alignment nor residue numbers pair enough residues of these "
+                    "two chains.",
+        }[requested]
+        raise AppError(400, f"alignment_error: only {len(idx)} matched residues with CA atoms; "
+                            f"need at least {MIN_PAIRS}.{hint}")
 
     P = np.array([M[i]["ca"] for i, _ in idx])
     Q = np.array([R[j]["ca"] for _, j in idx])
@@ -244,6 +296,7 @@ def align(mobile_model, reference_model, sel: dict | None = None) -> dict:
         "mobile_chain": mc,
         "reference_chain": rc,
         "matching": method,
+        "matching_requested": requested,
         "sequence_identity": round(identical / len(idx), 4),
         "mobile_residues_in_selection": len(M),
         "reference_residues_in_selection": len(R),
@@ -252,7 +305,7 @@ def align(mobile_model, reference_model, sel: dict | None = None) -> dict:
             for i, j in idx
         ],
         "procedure": "Single optimal rigid-body (Kabsch) superposition of matched CA atoms; no outlier rejection or iterative refinement for RMSD.",
-        "notes": [
+        "notes": ([auto_note] if auto_note else []) + [
             "RMSD depends on which residues are matched; low-confidence or disordered regions are included unless excluded via the selection ranges.",
             "RMSD and TM-score measure geometric similarity only, not function or binding.",
         ],

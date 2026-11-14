@@ -4,5 +4,6 @@ version = "0.1.0"
 requires-python = ">=3.10"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "app/services/explain_rules"]
+python_files = ["test_*.py"]
 pythonpath = ["."]

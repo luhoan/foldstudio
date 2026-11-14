@@ -2,14 +2,34 @@
   "version": 1,
   "disclaimer": "Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation.",
   "plddt_bins": [
-    {"id": "very_high", "min": 90, "max": 100, "label": "very high local model confidence",
-     "text": "pLDDT {value:.1f} (90-100): very high local model confidence. This is the model's own estimate of local accuracy for a predicted structure; it is not an experimental observation."},
-    {"id": "high", "min": 70, "max": 90, "label": "relatively high local model confidence",
-     "text": "pLDDT {value:.1f} (70-90): relatively high local model confidence. This describes the model's estimate of local backbone accuracy, not experimentally observed folding or function."},
-    {"id": "low", "min": 50, "max": 70, "label": "low local model confidence",
-     "text": "pLDDT {value:.1f} (50-70): low local model confidence. Treat the local geometry as uncertain."},
-    {"id": "very_low", "min": 0, "max": 50, "label": "very low local model confidence",
-     "text": "pLDDT {value:.1f} (below 50): very low local model confidence. Low values can occur in regions the model could not place reliably, including flexible or disordered regions, so this value alone does not say which."}
+    {
+      "id": "very_high",
+      "min": 90,
+      "max": 100,
+      "label": "very high local model confidence",
+      "text": "pLDDT {value:.1f} (90-100): very high local model confidence. This is the model's own estimate of local accuracy for a predicted structure; it is not an experimental observation."
+    },
+    {
+      "id": "high",
+      "min": 70,
+      "max": 90,
+      "label": "relatively high local model confidence",
+      "text": "pLDDT {value:.1f} (70-90): relatively high local model confidence. This describes the model's estimate of local backbone accuracy, not experimentally observed folding or function."
+    },
+    {
+      "id": "low",
+      "min": 50,
+      "max": 70,
+      "label": "low local model confidence",
+      "text": "pLDDT {value:.1f} (50-70): low local model confidence. Treat the local geometry as uncertain."
+    },
+    {
+      "id": "very_low",
+      "min": 0,
+      "max": 50,
+      "label": "very low local model confidence",
+      "text": "pLDDT {value:.1f} (below 50): very low local model confidence. Low values can occur in regions the model could not place reliably, including flexible or disordered regions, so this value alone does not say which."
+    }
   ],
   "templates": {
     "plddt_region": "Residues {start}-{end} of chain {chain} ({n} residues): mean pLDDT {mean:.1f}. Fraction of residues by bin: {bin_summary}. These are model confidence values from a predicted structure.",
@@ -22,6 +42,10 @@
     "exp_vs_pred": "Comparison of an experimental structure ({exp_id}) with a predicted model ({pred_id}). The experimental structure is derived from measured data for the deposited sample; the predicted model is a computational estimate. A low RMSD or high TM-score indicates the two coordinate sets are similar over the aligned atoms. It does not by itself indicate that either structure is correct for other conditions or states.",
     "exp_vs_pred_plddt": "Mean pLDDT of the predicted model over the compared residues was {mean:.1f}.",
     "interface": "Interface between chain {chain_a} and chain {chain_b} in {structure}: {n_contacts} residue pairs with heavy atoms within {cutoff:.1f} A. Mean pLDDT of interface residues is {iface_plddt:.1f}. Mean inter-chain PAE is {iface_pae:.1f} A. These numbers describe model confidence in the relative placement of the chains in the coordinates; they are not measurements of any physical property.",
-    "interface_experimental": "Interface between chain {chain_a} and chain {chain_b} in experimental entry {structure}: {n_contacts} residue pairs with heavy atoms within {cutoff:.1f} A, computed from the deposited coordinates. No model-confidence scores apply to experimental coordinates."
+    "interface_experimental": "Interface between chain {chain_a} and chain {chain_b} in experimental entry {structure}: {n_contacts} residue pairs with heavy atoms within {cutoff:.1f} A, computed from the deposited coordinates. No model-confidence scores apply to experimental coordinates.",
+    "no_confidence_experimental": "Residues {start}-{end} of chain {chain} ({n} residues) come from an experimental structure. No model-confidence scores apply to experimental coordinates: the B-factor column of this file holds experimental B-factors, which are a different quantity from pLDDT, so neither pLDDT nor PAE is reported for it.",
+    "no_confidence_unlabelled": "Residues {start}-{end} of chain {chain} ({n} residues) come from a file that was not declared to be a predicted model. Its B-factor column is therefore not read as pLDDT, and no model-confidence scores are reported for it. A designed backbone, for example, carries no confidence values of its own.",
+    "low_identity_matching": "The matched residues share {identity_pct:.0f}% sequence identity, so pairing them by sequence alignment may not reflect the intended residue correspondence. If the two structures use the same residue numbering, matching by residue number pairs position {example} with position {example} directly.",
+    "interface_coordinates_only": "Interface between chain {chain_a} and chain {chain_b} in {structure}: {n_contacts} residue pairs with heavy atoms within {cutoff:.1f} A, computed from the coordinates in this file. No model-confidence scores are reported for this interface."
   }
 }

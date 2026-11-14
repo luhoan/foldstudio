@@ -10,7 +10,7 @@ from app.db import init_db
 from app.errors import AppError
 from app.jobs.base import RunnerRegistry
 from app.jobs.runners import PrecomputedRunner
-from app.routers import analysis, experiments, jobs, reports, structures
+from app.routers import analysis, experiments, explain, jobs, reports, structures
 from app.services import experiments as exp_svc
 
 
@@ -41,7 +41,8 @@ def create_app(data_dir=None) -> FastAPI:
         msgs = "; ".join(f"{'.'.join(str(x) for x in e['loc'] if x != 'body')}: {e['msg']}" for e in exc.errors())
         return JSONResponse(status_code=422, content={"detail": f"invalid_request: {msgs}"})
 
-    for r in (structures.router, analysis.router, experiments.router, reports.router, jobs.router):
+    for r in (structures.router, analysis.router, experiments.router, reports.router, jobs.router,
+              explain.router):
         app.include_router(r, prefix="/api")
 
     @app.get("/api/health")

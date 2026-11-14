@@ -143,3 +143,145 @@ def test_align_endpoint_errors(client):
     assert client.post("/api/analysis/align", json={"mobile_id": a, "reference_id": "nope"}).status_code == 404
     assert client.post("/api/analysis/align", json={"mobile_id": a, "reference_id": a}).status_code == 400
     assert client.post("/api/analysis/align", json={"mobile_id": a}).status_code == 422
+
+
+# ---- the align response explains itself, from its own numbers
+
+def _align(client, mobile, reference, **selection):
+    r = client.post("/api/analysis/align", json={"mobile_id": mobile, "reference_id": reference,
+                                                 "selection": selection})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_align_response_carries_a_rule_based_explanation(client):
+    P = helix(30, noise=0.4, seed=3)
+    a = upload(client, make_pdb(P), "a.pdb").json()["id"]
+    b = upload(client, make_pdb(P + np.random.default_rng(1).normal(0, 0.6, P.shape)), "b.pdb").json()["id"]
+    j = _align(client, a, b)
+    assert j["explanations"][0]["rule_id"] == "alignment"
+    assert f"{j['rmsd']:.2f} A, computed on 30 CA atoms from 30 aligned residues" in j["summary"]
+    assert j["numbers_used"]["rmsd"] == j["rmsd"] and j["numbers_used"]["aligned_atoms"] == 30
+    assert len(j["limitations"]) == 1 and "is not evidence of" in j["limitations"][0]
+    assert (j["mobile_label"], j["reference_label"]) == ("a.pdb", "b.pdb")
+
+
+def test_experimental_vs_predicted_reports_plddt_of_exactly_the_matched_residues(client):
+    P = helix(20)
+    b = [90.0] * 10 + [50.0] * 10
+    pred = upload(client, make_pdb(P, bfactors=b), "pred.pdb", source="predicted").json()["id"]
+    exp = upload(client, make_pdb(P), "exp.pdb", source="experimental").json()["id"]
+    whole = _align(client, pred, exp, method="resnum")
+    assert whole["explanations"][0]["rule_id"] == "experimental_vs_predicted"
+    assert whole["numbers_used"]["mean_plddt"] == 70.0
+    # restrict to the first ten residues: the mean must follow the selection, not the file
+    part = _align(client, pred, exp, method="resnum", mobile_range=[1, 10], reference_range=[1, 10])
+    assert part["aligned_residues"] == 10
+    assert part["numbers_used"]["mean_plddt"] == 90.0
+    # and it does not matter which one is called mobile
+    flipped = _align(client, exp, pred, method="resnum")
+    assert flipped["numbers_used"]["mean_plddt"] == 70.0
+    assert flipped["numbers_used"]["experimental_id"] == "exp.pdb"
+
+
+def test_bfactors_of_an_experimental_file_are_never_reported_as_plddt(client):
+    P = helix(15)
+    a = upload(client, make_pdb(P, bfactors=[95.0] * 15), "x1.pdb", source="experimental").json()["id"]
+    b = upload(client, make_pdb(P, bfactors=[95.0] * 15), "x2.pdb", source="uploaded").json()["id"]
+    j = _align(client, a, b)
+    assert "mean_plddt" not in j["numbers_used"]
+    assert "pLDDT" not in j["summary"]
+
+
+def _design_pair(client, n=24):
+    """A poly-glycine backbone and the same coordinates carrying a real sequence.
+
+    That is what an RFdiffusion backbone and the prediction of its designed
+    sequence look like to the aligner: same numbering, unrelated "sequences".
+    """
+    P = helix(n)
+    backbone = upload(client, make_pdb(P, resnames=["GLY"] * n), "design_0.pdb").json()["id"]
+    # Residues that each score -3 or -4 against glycine in BLOSUM62, so leaving the
+    # two chains unaligned (about -43 in gap penalties for 24 residues) clearly beats
+    # pairing them (about -84). The outcome does not hinge on a near-tie.
+    varied = (["ILE", "LEU", "PHE", "VAL"] * n)[:n]
+    predicted = upload(client, make_pdb(P, resnames=varied), "design_0_s1.pdb",
+                       source="predicted").json()["id"]
+    return backbone, predicted
+
+
+def test_sequence_matching_cannot_pair_a_designed_backbone_and_says_what_to_do(client):
+    """All-glycine against a real sequence: the aligner pairs almost nothing."""
+    backbone, predicted = _design_pair(client)
+    r = client.post("/api/analysis/align", json={"mobile_id": predicted, "reference_id": backbone,
+                                                 "selection": {"method": "sequence"}})
+    assert r.status_code == 400
+    assert "need at least 3" in r.json()["detail"]
+    assert "method='resnum'" in r.json()["detail"]
+
+
+def test_auto_matching_falls_back_to_residue_numbers_and_says_so(client):
+    backbone, predicted = _design_pair(client)
+    j = _align(client, predicted, backbone, method="auto")
+    assert (j["matching_requested"], j["matching"]) == ("auto", "resnum")
+    assert j["aligned_residues"] == 24 and j["rmsd"] < 1e-3
+    assert "chosen automatically" in j["notes"][0]
+    assert "paired by residue number instead (24 pairs)" in j["notes"][0]
+    assert [e["rule_id"] for e in j["explanations"]] == ["alignment"]
+
+
+def test_auto_matching_keeps_sequence_alignment_when_it_is_believable(client):
+    """Related sequences with DIFFERENT numbering: residue numbers would pair nothing useful."""
+    P = helix(30)
+    a = upload(client, make_pdb(P), "a.pdb").json()["id"]
+    b = upload(client, make_pdb(P, start=501), "b.pdb").json()["id"]
+    j = _align(client, a, b, method="auto")
+    assert (j["matching_requested"], j["matching"]) == ("auto", "sequence")
+    assert j["aligned_residues"] == 30 and j["sequence_identity"] == 1.0
+    assert not any("chosen automatically" in n for n in j["notes"])
+
+
+def test_auto_matching_fails_plainly_when_nothing_pairs(client):
+    """Two residues in the selection: no method can reach the three pairs a fit needs."""
+    a = upload(client, make_pdb(helix(10)), "tiny_a.pdb").json()["id"]
+    b = upload(client, make_pdb(helix(10)), "tiny_b.pdb").json()["id"]
+    r = client.post("/api/analysis/align", json={
+        "mobile_id": a, "reference_id": b,
+        "selection": {"method": "auto", "mobile_range": [1, 2], "reference_range": [1, 2]}})
+    assert r.status_code == 400
+    assert "Neither sequence alignment nor residue numbers" in r.json()["detail"]
+
+
+def test_unknown_method_names_the_three_that_exist(client):
+    a = upload(client, make_pdb(helix(10)), "m_a.pdb").json()["id"]
+    b = upload(client, make_pdb(helix(10)), "m_b.pdb").json()["id"]
+    r = client.post("/api/analysis/align", json={"mobile_id": a, "reference_id": b,
+                                                 "selection": {"method": "magic"}})
+    assert r.status_code == 400 and "'sequence', 'resnum' or 'auto'" in r.json()["detail"]
+
+
+def test_low_identity_sequence_matching_is_flagged(client):
+    """Enough residues pair, but at an identity too low to trust the pairing."""
+    P = helix(40)
+    seq_a = (["ALA", "LEU", "LYS", "GLU"] * 10)
+    seq_b = list(seq_a)
+    for k in range(40):
+        if k % 5:                      # keep one residue in five: 20% identity
+            seq_b[k] = {"ALA": "SER", "LEU": "ILE", "LYS": "ARG", "GLU": "ASP"}[seq_a[k]]
+    a = upload(client, make_pdb(P, resnames=seq_a), "a.pdb").json()["id"]
+    b = upload(client, make_pdb(P, resnames=seq_b), "b.pdb").json()["id"]
+    j = _align(client, a, b, method="sequence")
+    assert j["aligned_residues"] == 40
+    assert j["sequence_identity"] == pytest.approx(0.2)
+    assert [e["rule_id"] for e in j["explanations"]] == ["alignment", "low_identity_matching"]
+    assert any("resnum" in n for n in j["notes"])
+    assert "20% sequence identity" in j["summary"]
+
+
+def test_similar_sequences_are_not_flagged(client):
+    P = helix(30)
+    a = upload(client, make_pdb(P), "a.pdb").json()["id"]
+    b = upload(client, make_pdb(P), "b.pdb").json()["id"]
+    j = _align(client, a, b)
+    assert j["sequence_identity"] == 1.0
+    assert [e["rule_id"] for e in j["explanations"]] == ["alignment"]

@@ -159,3 +159,38 @@ def explain_interface(structure: str, chain_a: str, chain_b: str, n_contacts: in
             chain_a=chain_a, chain_b=chain_b, structure=structure, n_contacts=n_contacts,
             cutoff=cutoff, iface_plddt=iface_plddt, iface_pae=iface_pae)
     return _finish("interface", body, refs)
+
+
+def explain_no_confidence(source: str, chain: str, start: int, end: int, n: int) -> Explanation:
+    """For structures that are not predicted models: say why no confidence is reported.
+
+    `source` is the structure's declared source ("experimental" or "uploaded").
+    Nothing is read from the B-factor column here, which is the point.
+    """
+    key = "no_confidence_experimental" if source == "experimental" else "no_confidence_unlabelled"
+    refs = [_ref("source", source), _ref("n_residues", n), _ref("chain", chain),
+            _ref("start", start), _ref("end", end)]
+    return _finish("no_confidence", T[key].format(start=start, end=end, chain=chain, n=n), refs)
+
+
+def explain_low_identity_matching(sequence_identity: float, example_resnum: int) -> Explanation:
+    """Caveat for a sequence-matched alignment between very dissimilar sequences."""
+    refs = [_ref("sequence_identity", round(sequence_identity, 4)),
+            _ref("example_resnum", example_resnum)]
+    body = T["low_identity_matching"].format(identity_pct=100 * sequence_identity,
+                                             example=example_resnum)
+    return _finish("low_identity_matching", body, refs)
+
+
+def explain_interface_coordinates(structure: str, chain_a: str, chain_b: str,
+                                  n_contacts: int, cutoff: float) -> Explanation:
+    """Interface wording that asserts nothing about where the coordinates came from.
+
+    For files that are neither a declared experimental entry nor a predicted
+    model with both interface confidence numbers available.
+    """
+    refs = [_ref("structure", structure), _ref("chain_a", chain_a), _ref("chain_b", chain_b),
+            _ref("n_contacts", n_contacts), _ref("cutoff", cutoff, "A")]
+    body = T["interface_coordinates_only"].format(
+        chain_a=chain_a, chain_b=chain_b, structure=structure, n_contacts=n_contacts, cutoff=cutoff)
+    return _finish("interface_coordinates", body, refs)

@@ -36,6 +36,11 @@ def all_outputs():
         out.append(E.explain_experimental_vs_predicted("1EMA", "AF-P42212-F1", 0.9, tm, n, n, "CA"))
     out.append(E.explain_interface("6M0J", "A", "E", 40, 4.5, 85.0, 6.0))
     out.append(E.explain_interface("6M0J", "A", "E", 40, 4.5))
+    for source in ("experimental", "uploaded"):
+        out.append(E.explain_no_confidence(source, "A", 1, 60, 60))
+    for identity in (0.0, 0.05, 0.24):
+        out.append(E.explain_low_identity_matching(identity, 17))
+    out.append(E.explain_interface_coordinates("my_upload.pdb", "A", "B", 12, 4.5))
     return out
 
 
@@ -120,6 +125,30 @@ class ReferencesNumbers(unittest.TestCase):
         ex = E.explain_interface("6M0J", "A", "E", 33, 4.5)
         self.assertNotIn("pLDDT", ex.text)
         self.assertIn("computed from the deposited coordinates", ex.text)
+
+    def test_non_predicted_structures_get_no_confidence_numbers(self):
+        exp = E.explain_no_confidence("experimental", "A", 1, 46, 46)
+        self.assertIn("experimental B-factors", exp.text)
+        self.assertIn("different quantity from pLDDT", exp.text)
+        unl = E.explain_no_confidence("uploaded", "A", 1, 60, 60)
+        self.assertIn("not declared", unl.text)
+        self.assertIn("designed backbone", unl.text)
+        for ex in (exp, unl):
+            names = {r["name"] for r in ex.refs}
+            self.assertFalse(names & {"plddt", "mean_plddt", "mean_pae"},
+                             "no confidence value may be attached to a non-predicted structure")
+
+    def test_coordinates_only_interface_asserts_no_origin(self):
+        """An uploaded file must not be called an experimental entry or a model."""
+        ex = E.explain_interface_coordinates("my_upload.pdb", "A", "B", 12, 4.5)
+        for word in ("experimental", "deposited", "pLDDT", "PAE"):
+            self.assertNotIn(word, strip_disclaimer(ex.text))
+        self.assertIn("12 residue pairs", ex.text)
+
+    def test_low_identity_caveat_states_the_identity(self):
+        ex = E.explain_low_identity_matching(0.05, 17)
+        self.assertIn("5% sequence identity", ex.text)
+        self.assertIn("matching by residue number", ex.text)
 
     def test_deterministic(self):
         a = [e.to_dict() for e in all_outputs()]
