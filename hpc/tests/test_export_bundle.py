@@ -410,6 +410,163 @@ class TestSimulatedRun(unittest.TestCase):
         self.assertEqual(set(exp["metrics"]) & set(exp["metrics_unavailable"]), set())
 
 
+class TestWorkflowBlock(unittest.TestCase):
+    """The `workflow` block drives Stream 5's WorkflowStepper. It must never show
+    a greener state than the experiment record justifies."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="fs-wf-")
+        self.work = os.path.join(self.tmp, "run")
+        for sub in ("backbones", "seqs", "pred", "provenance"):
+            os.makedirs(os.path.join(self.work, sub), exist_ok=True)
+        self.events = os.path.join(self.work, "provenance", "events.jsonl")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def files(self):
+        shutil.copy2(BACKBONE, os.path.join(self.work, "backbones", "design_0.pdb"))
+        shutil.copy2(MPNN_FA, os.path.join(self.work, "seqs", "design_0.fa"))
+
+    def ran(self, stage, exit_code=0, error=None):
+        ledger.append(self.events, {"run_id": "R", "stage": stage, "event": "stage_start",
+                                    "host": "n1"})
+        rec = {"run_id": "R", "stage": stage, "event": "stage_end", "exit": exit_code,
+               "wall_seconds": 5.0}
+        if error:
+            rec["error"] = error
+        ledger.append(self.events, rec)
+
+    def build(self, eid):
+        _, exp, _ = build_to(os.path.join(self.tmp, "data"), work_dir=self.work,
+                             experiment_id=eid)
+        return {r["stage"]: r for r in exp["workflow"]}, exp
+
+    def test_exactly_the_six_stepper_stages_in_order(self):
+        self.files()
+        self.ran("rfdiffusion")
+        _, exp = self.build("hpc_wf_order")
+        self.assertEqual([r["stage"] for r in exp["workflow"]],
+                         ["Structure", "Backbone generation", "Sequence design",
+                          "Structure prediction", "Evaluation", "Candidate review"])
+
+    def test_every_row_has_a_printable_status_label(self):
+        self.files()
+        self.ran("rfdiffusion")
+        _, exp = self.build("hpc_wf_labels")
+        for row in exp["workflow"]:
+            self.assertTrue(row["status_label"])
+            self.assertIn(row["status"],
+                          ("not_started", "imported", "demo", "executed", "failed", "partial"))
+
+    def test_executed_stage_is_marked_executed(self):
+        self.files()
+        self.ran("rfdiffusion")
+        self.ran("proteinmpnn")
+        rows, _ = self.build("hpc_wf_exec")
+        self.assertEqual(rows["Backbone generation"]["status"], "executed")
+        self.assertEqual(rows["Backbone generation"]["ledger_stage"], "rfdiffusion")
+        self.assertEqual(rows["Sequence design"]["status"], "executed")
+
+    def test_stage_that_never_ran_is_not_started(self):
+        self.files()
+        self.ran("rfdiffusion")
+        rows, _ = self.build("hpc_wf_notstarted")
+        self.assertEqual(rows["Structure prediction"]["status"], "not_started")
+        self.assertEqual(rows["Structure prediction"]["outputs"], 0)
+
+    def test_failed_stage_carries_the_real_error_text(self):
+        self.files()
+        self.ran("rfdiffusion")
+        self.ran("proteinmpnn")
+        self.ran("predict_esmfold", exit_code=1,
+                 error="RuntimeError: CUDA out of memory on device 0")
+        rows, _ = self.build("hpc_wf_failed")
+        self.assertEqual(rows["Structure prediction"]["status"], "failed")
+        self.assertIn("CUDA out of memory", rows["Structure prediction"]["error"])
+
+    def test_files_without_ledger_are_not_marked_executed(self):
+        self.files()  # files only, no ledger entries at all
+        rows, exp = self.build("hpc_wf_nolog")
+        self.assertNotEqual(rows["Backbone generation"]["status"], "executed")
+        self.assertEqual(exp["kind"], "imported")
+
+    def test_structure_stage_explains_why_it_is_empty(self):
+        self.files()
+        self.ran("rfdiffusion")
+        rows, _ = self.build("hpc_wf_structure")
+        self.assertEqual(rows["Structure"]["status"], "not_started")
+        self.assertIn("de novo", rows["Structure"]["note"])
+
+    def test_candidate_review_is_left_to_the_app(self):
+        self.files()
+        self.ran("rfdiffusion")
+        rows, _ = self.build("hpc_wf_review")
+        self.assertEqual(rows["Candidate review"]["status"], "not_started")
+        self.assertIn("FoldStudio", rows["Candidate review"]["note"])
+
+    def test_evaluation_reflects_metrics_actually_computed(self):
+        self.files()
+        self.ran("rfdiffusion")
+        self.ran("proteinmpnn")
+        rows, exp = self.build("hpc_wf_eval")
+        # mpnn scores are computed from the real FASTA, so Evaluation is not empty.
+        self.assertEqual(rows["Evaluation"]["status"], "executed")
+        self.assertIn("mpnn_best_score", rows["Evaluation"]["note"])
+
+    def test_preemptions_surface_per_stage(self):
+        self.files()
+        ledger.append(self.events, {"run_id": "R", "stage": "rfdiffusion",
+                                    "event": "stage_start", "host": "n1"})
+        ledger.append(self.events, {"run_id": "R", "stage": "rfdiffusion", "event": "preempted"})
+        ledger.append(self.events, {"run_id": "R", "stage": "rfdiffusion",
+                                    "event": "stage_start", "host": "n2"})
+        ledger.append(self.events, {"run_id": "R", "stage": "rfdiffusion",
+                                    "event": "stage_end", "exit": 0, "wall_seconds": 7.0})
+        rows, _ = self.build("hpc_wf_preempt")
+        self.assertEqual(rows["Backbone generation"]["preemptions"], 1)
+
+
+class TestProvenanceDoesNotOverclaimLocation(unittest.TestCase):
+    """A stage may have run off-cluster (see hpc/OFFLOAD.md), so provenance must
+    report the evidence rather than assert the Mill."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="fs-prov-")
+        self.work = os.path.join(self.tmp, "run")
+        for sub in ("backbones", "seqs", "provenance"):
+            os.makedirs(os.path.join(self.work, sub), exist_ok=True)
+        shutil.copy2(BACKBONE, os.path.join(self.work, "backbones", "design_0.pdb"))
+        shutil.copy2(MPNN_FA, os.path.join(self.work, "seqs", "design_0.fa"))
+        ev = os.path.join(self.work, "provenance", "events.jsonl")
+        ledger.append(ev, {"run_id": "R", "stage": "rfdiffusion", "event": "stage_start",
+                           "host": "colab-gpu-t4"})
+        ledger.append(ev, {"run_id": "R", "stage": "rfdiffusion", "event": "stage_end",
+                           "exit": 0, "wall_seconds": 9.0})
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+        os.environ.pop("FS_SITE", None)
+
+    def test_does_not_claim_the_mill_when_nothing_says_so(self):
+        _, exp, _ = build_to(os.path.join(self.tmp, "d"), work_dir=self.work,
+                             experiment_id="hpc_prov_nomill")
+        blob = json.dumps(exp["provenance"])
+        self.assertNotIn("Mill", blob)
+        self.assertIn("no Slurm job id was recorded", blob)
+
+    def test_records_the_hosts_it_actually_saw(self):
+        _, exp, _ = build_to(os.path.join(self.tmp, "d2"), work_dir=self.work,
+                             experiment_id="hpc_prov_hosts")
+        self.assertIn("colab-gpu-t4", exp["provenance"]["notes"])
+
+    def test_fs_site_is_reported_when_given(self):
+        os.environ["FS_SITE"] = "Google Colab (T4)"
+        _, exp, _ = build_to(os.path.join(self.tmp, "d3"), work_dir=self.work,
+                             experiment_id="hpc_prov_site")
+        self.assertIn("Google Colab (T4)", exp["provenance"]["source"])
+
+
 class TestValidatorCatchesViolations(unittest.TestCase):
     """The validator has to actually fail on bad bundles, or it proves nothing."""
 

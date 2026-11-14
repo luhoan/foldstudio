@@ -1,0 +1,42 @@
+{
+  "caveats": [
+    "pLDDT, PAE and pTM are the model's own confidence estimates. They are not evidence of folding, binding, affinity, efficacy, safety or biological function.",
+    "Self-consistency RMSD compares a designed backbone with a structure predicted from the designed sequence. It measures agreement between two computational models, not experimental validation.",
+    "FoldStudio is not a clinical tool and this bundle is not evidence for any therapeutic use.",
+    "Every value under 'values' was computed from a file in this bundle. Nothing here is a placeholder: a metric that could not be computed appears under 'unavailable' with the reason, and is absent from 'values'."
+  ],
+  "definitions": {
+    "backbone_n_residues_max": "Most CA atoms in any backbone file here.",
+    "backbone_n_residues_min": "Fewest CA atoms in any backbone file here.",
+    "mpnn_best_score": "Lowest (best) ProteinMPNN score= value, read verbatim from the FASTA headers it wrote. Lower is better; it is a negative log-likelihood, not a probability of folding.",
+    "mpnn_mean_score": "Mean of the ProteinMPNN score= values in this bundle.",
+    "mpnn_mean_seq_recovery": "Mean ProteinMPNN seq_recovery= against the input structure's own sequence. Meaningful here only because the input was a real structure with a real native sequence.",
+    "mpnn_model_name": "ProteinMPNN model name, read from its own FASTA header.",
+    "mpnn_seed": "Seed ProteinMPNN recorded in its own FASTA header.",
+    "n_backbones": "Number of backbone PDB files present in this bundle (counted, not predicted).",
+    "n_sequences_designed": "Number of ProteinMPNN design records (records carrying sample=N; the input sequence record is excluded)."
+  },
+  "experiment_id": "hpc_demo_example",
+  "generated_at": "2026-11-14T07:01:15+00:00",
+  "kind": "demo",
+  "per_design": [],
+  "status": "ok",
+  "unavailable": {
+    "predicted_best_mean_plddt": "the dry run was given no real predicted model. No pLDDT-bearing prediction is bundled with the repo, and inventing B-factors and calling them pLDDT is not acceptable. Pass --predicted <real predicted model> to exercise this path.",
+    "predicted_mean_plddt": "the dry run was given no real predicted model. No pLDDT-bearing prediction is bundled with the repo, and inventing B-factors and calling them pLDDT is not acceptable. Pass --predicted <real predicted model> to exercise this path.",
+    "predicted_mean_ptm": "the dry run was given no real predicted model. No pLDDT-bearing prediction is bundled with the repo, and inventing B-factors and calling them pLDDT is not acceptable. Pass --predicted <real predicted model> to exercise this path.",
+    "self_consistency_ca_rmsd_best": "the dry run was given no real predicted model. No pLDDT-bearing prediction is bundled with the repo, and inventing B-factors and calling them pLDDT is not acceptable. Pass --predicted <real predicted model> to exercise this path.",
+    "self_consistency_ca_rmsd_mean": "the dry run was given no real predicted model. No pLDDT-bearing prediction is bundled with the repo, and inventing B-factors and calling them pLDDT is not acceptable. Pass --predicted <real predicted model> to exercise this path."
+  },
+  "values": {
+    "backbone_n_residues_max": 106,
+    "backbone_n_residues_min": 106,
+    "mpnn_best_score": 0.8221,
+    "mpnn_mean_score": 0.8289,
+    "mpnn_mean_seq_recovery": 0.4764,
+    "mpnn_model_name": "v_48_020",
+    "mpnn_seed": 37,
+    "n_backbones": 1,
+    "n_sequences_designed": 2
+  }
+}

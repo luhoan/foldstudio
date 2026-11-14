@@ -21,14 +21,22 @@ _FS_ENV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export FS_REPO
 
 # ------------------------------------------------------------------- Slurm
-# Free/unbilled users on the Mill get the `requeue` partition: max wall time
-# 1 day, and jobs MAY BE PREEMPTED AT ANY TIME. std-v100 / std-h100 require an
-# MOU and a billing account, so they are opt-in only.
+# WHICH PARTITION: our two briefs disagree, and only discovery settles it.
+#   `requeue`  -- free/unbilled access, max wall time 1 day, PREEMPTIBLE AT ANY TIME
+#   `class`    -- student/coursework access, max 4 hours per job (and its
+#                 acceptable use for a research pipeline needs ITRSS's say-so)
+#   std-v100 / std-h100 -- need an MOU and a billing account; opt-in only.
+# Run hpc/00_discover.sh, read its section 5, then set FS_PARTITION to whatever
+# you actually have. `bash hpc/run_pipeline.sh preflight` checks the real
+# MaxTime and GRES of whatever you pick before anything is submitted.
 : "${FS_PARTITION:=requeue}"
 : "${FS_ACCOUNT:=}"            # leave empty on requeue; set for std-v100/std-h100
 : "${FS_GPU_GRES:=gpu:1}"      # e.g. gpu:v100:1 or gpu:h100:1 once discovery confirms names
-: "${FS_TIME_GPU:=08:00:00}"   # <= 1-00:00:00 on requeue
-: "${FS_TIME_CPU:=02:00:00}"
+# Default deliberately fits UNDER a 4-hour cap, so it is valid on `class` as well
+# as `requeue`. Every stage checkpoints and resumes, so short jobs cost nothing
+# but an extra `resume`. Raise it only once you know the partition allows it.
+: "${FS_TIME_GPU:=03:45:00}"
+: "${FS_TIME_CPU:=01:00:00}"
 : "${FS_CPUS:=4}"
 : "${FS_MEM:=48G}"
 # Minutes of warning Slurm gives us before preemption/time limit (checkpoint window).

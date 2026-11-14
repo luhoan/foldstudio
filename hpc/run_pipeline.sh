@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Stream 3 driver -- submit, watch, resume and export one pipeline run.
 #
+#     bash hpc/run_pipeline.sh preflight     # does this partition allow what we ask for?
 #     bash hpc/run_pipeline.sh submit        # submit stages 20->30->40->50
 #     bash hpc/run_pipeline.sh status        # squeue + per-stage ledger summary
 #     bash hpc/run_pipeline.sh resume <RUN>  # resubmit only the unfinished stages
@@ -103,8 +104,69 @@ do_plan() {
   echo "(the first stage is submitted without --dependency)"
 }
 
+# Check the partition can actually run what we are about to ask for, BEFORE
+# submitting anything. A job over MaxTime is rejected or pends forever, and on a
+# 4-hour coursework partition that is an easy mistake to make.
+#   walltime over the cap -> hard failure (scontrol's MaxTime is reliable)
+#   no GPU GRES visible   -> loud warning (sinfo's %G is not always populated)
+# Set FS_SKIP_PREFLIGHT=1 to bypass.
+do_preflight() {
+  local want_gpu="${1:-yes}"
+  if [ "${FS_SKIP_PREFLIGHT:-0}" = "1" ]; then
+    fs_log "FS_SKIP_PREFLIGHT=1: skipping partition preflight"
+    return 0
+  fi
+  command -v scontrol >/dev/null 2>&1 || {
+    fs_log "note: scontrol not available, skipping partition preflight"
+    return 0
+  }
+
+  echo "--- preflight: partition '${FS_PARTITION}' ---"
+  if ! fs_partition_exists "${FS_PARTITION}"; then
+    fs_die "partition '${FS_PARTITION}' does not exist on this cluster.
+Run 'bash hpc/00_discover.sh' and set FS_PARTITION to one you are allowed to use
+(its section 2 lists your associations)."
+  fi
+
+  local maxs gres
+  maxs="$(fs_partition_max_seconds "${FS_PARTITION}")"
+  gres="$(fs_partition_gres "${FS_PARTITION}")"
+  if [ "${maxs}" = "-1" ]; then
+    echo "  MaxTime : unlimited"
+  elif [ "${maxs}" = "-2" ]; then
+    echo "  MaxTime : could not be parsed (skipping the wall-time check)"
+  else
+    printf '  MaxTime : %s min\n' "$(( maxs / 60 ))"
+  fi
+  echo "  GRES    : ${gres:-<none advertised>}"
+
+  fs_check_walltime "${FS_PARTITION}" "${FS_TIME_GPU}" "GPU stages (20, 40)"
+  fs_check_walltime "${FS_PARTITION}" "${FS_TIME_CPU}" "CPU stages (30, 50)"
+
+  if [ "${want_gpu}" = "yes" ] && ! printf '%s' "${gres}" | grep -qi 'gpu'; then
+    cat >&2 <<EOF
+
+  WARNING: partition '${FS_PARTITION}' advertises no GPU GRES in sinfo output.
+  Stages 20 (RFdiffusion) and 40 (prediction) need a GPU and will fail or pend.
+  Options, in order of preference:
+    1. set FS_PARTITION to one that has GPUs (see hpc/DISCOVERED.md section 5);
+    2. run the two GPU stages off-cluster and bring the files back --
+       hpc/OFFLOAD.md gives the exact file contract;
+    3. skip Stream 3. The app is complete without it, and nothing gets
+       labelled "Executed".
+  sinfo's GRES column is not always populated, so this is a warning, not a stop.
+  Override with FS_SKIP_PREFLIGHT=1 if you know the partition really has GPUs.
+
+EOF
+  fi
+  echo "  walltime: OK for both GPU and CPU stages"
+  echo
+  return 0
+}
+
 do_submit() {
   need_sbatch
+  do_preflight yes
   fs_mkdirs
   FS_STAGE="driver"
   export FS_STAGE
@@ -193,6 +255,7 @@ do_status() {
 # Resubmit only what is not finished, reusing the same RUN_ID so checkpoints apply.
 do_resume() {
   need_sbatch
+  do_preflight yes
   [ -d "${FS_WORK}" ] || fs_die "no such run directory: ${FS_WORK}
 Pass the run id:  bash hpc/run_pipeline.sh resume <RUN_ID>"
   fs_mkdirs
@@ -260,8 +323,9 @@ case "${subcmd}" in
     [ -n "${1:-}" ] || fs_die "export needs a run id: bash hpc/run_pipeline.sh export <RUN_ID>"
     fs_set_run_id "$1"; shift
     do_export "$@" ;;
-  dry-run) do_dry_run "$@" ;;
-  plan)    do_plan ;;
+  dry-run)   do_dry_run "$@" ;;
+  plan)      do_plan ;;
+  preflight) do_preflight "${1:-yes}" ;;
   ""|-h|--help|help) usage ;;
-  *) fs_die "unknown command '${subcmd}'. Try: submit | status | resume | export | dry-run | plan" ;;
+  *) fs_die "unknown command '${subcmd}'. Try: preflight | submit | status | resume | export | dry-run | plan" ;;
 esac

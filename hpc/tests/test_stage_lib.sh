@@ -208,7 +208,42 @@ else
   bad "ledger pretty failed: $(cat "${TMP}/pretty.txt")"
 fi
 
-# ------------------------------------------------------- 7. torn ledger line survives
+# ------------------------------- 7. Slurm wall-time parsing (guards the preflight)
+# fs_check_walltime refuses to submit a job the partition will never schedule, so
+# this parser has to handle every format scontrol prints for MaxTime.
+#   4:00:00 is the `class` cap, 1-00:00:00 the `requeue` cap.
+if ( . "${REPO}/hpc/env.sh"; . "${REPO}/hpc/lib/common.sh"
+     set -e
+     [ "$(fs_time_to_seconds '4:00:00')"    = "14400" ]
+     [ "$(fs_time_to_seconds '1-00:00:00')" = "86400" ]
+     [ "$(fs_time_to_seconds '03:45:00')"   = "13500" ]
+     [ "$(fs_time_to_seconds '2-12:00:00')" = "216000" ]
+     [ "$(fs_time_to_seconds '1-12')"       = "129600" ]
+     [ "$(fs_time_to_seconds '1-06:30')"    = "109800" ]
+     [ "$(fs_time_to_seconds '60')"         = "3600" ]
+     [ "$(fs_time_to_seconds '30:00')"      = "1800" ]
+     [ "$(fs_time_to_seconds 'UNLIMITED')"  = "-1" ]
+     [ "$(fs_time_to_seconds 'INFINITE')"   = "-1" ]
+     [ "$(fs_time_to_seconds '')"           = "-1" ]
+     [ "$(fs_time_to_seconds 'garbage')"    = "-2" ] ) 2>/dev/null; then
+  ok "Slurm MaxTime parsing covers every format scontrol prints"
+else
+  bad "Slurm MaxTime parsing is wrong -- the preflight wall-time guard cannot be trusted"
+fi
+
+# A 4-hour cap must reject our 8-hour-style request and accept the 3:45 default.
+if ( . "${REPO}/hpc/env.sh"; . "${REPO}/hpc/lib/common.sh"
+     set -e
+     a="$(fs_time_to_seconds '08:00:00')"; b="$(fs_time_to_seconds '4:00:00')"
+     [ "$a" -gt "$b" ]
+     c="$(fs_time_to_seconds "${FS_TIME_GPU}")"
+     [ "$c" -le "$b" ] ) 2>/dev/null; then
+  ok "default FS_TIME_GPU fits inside a 4-hour partition cap"
+else
+  bad "default FS_TIME_GPU would be rejected by a 4-hour partition"
+fi
+
+# ------------------------------------------------------- 8. torn ledger line survives
 printf '{"event":"stage_start","stage":"tr' >>"$LEDGER"
 printf '\n' >>"$LEDGER"
 check "torn line ignored, ledger still readable" "$(count_ev "$LEDGER" demo_ok cmd)" "2"

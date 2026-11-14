@@ -685,9 +685,21 @@ def build(args) -> tuple[Bundle, dict, dict]:
             "protein, and the ProteinMPNN scores are upstream's own numbers for 5L33.")
     else:
         host_list = sorted({h for s in stages.values() for h in (s.get("hosts") or [])})
+        # Do not assert WHERE this ran. A GPU stage may have been run off-cluster
+        # (Colab/Kaggle/Adroit -- see hpc/OFFLOAD.md), and claiming "the Mill"
+        # for work that happened elsewhere would be false provenance. Report the
+        # evidence: recorded hostnames, and whether a Slurm job id exists.
+        slurm_ids = sorted({jid for s in stages.values()
+                            for k, jid in (s.get("slurm") or {}).items()
+                            if k == "SLURM_JOB_ID"})
+        where = (f"Slurm job id(s) {', '.join(slurm_ids)}" if slurm_ids
+                 else "no Slurm job id was recorded, so at least one stage ran outside a "
+                      "Slurm batch job")
+        site = os.environ.get("FS_SITE", "").strip()
         notes_parts.append(
-            "Executed by the FoldStudio Stream 3 pipeline on a Slurm cluster "
-            f"(hosts: {', '.join(host_list) or 'not recorded'}). Stages: "
+            "Executed by the FoldStudio Stream 3 pipeline"
+            + (f" at {site}" if site else "")
+            + f" (hosts: {', '.join(host_list) or 'not recorded'}; {where}). Stages: "
             + "; ".join(f"{k}={'ran' if v.get('ran') else 'did not run'}"
                         f"{' preempted x' + str(v['preemptions']) if v.get('preemptions') else ''}"
                         f" exit={v.get('exit_status')}" for k, v in stages.items()))
@@ -715,8 +727,11 @@ def build(args) -> tuple[Bundle, dict, dict]:
         "metrics": dict(b.metrics),
         "error": error_text,
         "provenance": {
+            # Derived from evidence, never asserted: see the note built above.
             "source": ("FoldStudio HPC pipeline dry run (no execution)" if dry
-                       else "FoldStudio HPC pipeline (Missouri S&T Mill, Slurm)"),
+                       else "FoldStudio HPC pipeline"
+                            + (f" ({os.environ['FS_SITE'].strip()})"
+                               if os.environ.get("FS_SITE", "").strip() else "")),
             "retrieved_at": now_iso(),
             "url": None,
             "notes": " ".join(notes_parts),
@@ -724,6 +739,12 @@ def build(args) -> tuple[Bundle, dict, dict]:
         # extra, contract-compatible detail (the Experiment model allows extras)
         "per_design": b.per_design,
         "metrics_unavailable": dict(b.unavailable),
+        # Stream 5's WorkflowStepper reads this instead of guessing at our stage names.
+        "workflow": workflow_block(
+            stages, kind,
+            {"backbones": len(run["backbones"]), "sequences": len(run["sequences"]),
+             "predictions": len(run["predictions"])},
+            b.metrics, b.unavailable),
         "stage_summary": {k: {kk: vv for kk, vv in v.items() if kk != "commands"}
                           for k, v in stages.items()},
     }
@@ -734,6 +755,119 @@ def build(args) -> tuple[Bundle, dict, dict]:
             "its pLDDT-derived metrics describe that file, which this pipeline did not produce.")
 
     return b, experiment, run
+
+
+# Stream 5's WorkflowStepper shows these six stages, in this order, with a status
+# of "not started / imported / executed / failed with error text" taken from the
+# experiment record. Our ledger uses tool names, so the bundle publishes an
+# explicit mapping instead of making the UI guess. `status_label` is there so a
+# panel can print it directly without knowing our vocabulary.
+UI_WORKFLOW = (
+    ("Structure", None),
+    ("Backbone generation", "rfdiffusion"),
+    ("Sequence design", "proteinmpnn"),
+    ("Structure prediction", "predict_*"),
+    ("Evaluation", None),
+    ("Candidate review", None),
+)
+STATUS_LABELS = {
+    "not_started": "not started",
+    "imported": "imported",
+    "demo": "demo",
+    "executed": "executed",
+    "failed": "failed",
+    "partial": "partial",
+}
+
+EVALUATION_METRIC_KEYS = (
+    "self_consistency_ca_rmsd_best", "self_consistency_ca_rmsd_mean",
+    "predicted_mean_plddt", "predicted_best_mean_plddt", "predicted_mean_ptm",
+    "mpnn_best_score", "mpnn_mean_score",
+)
+
+
+def workflow_block(stages: dict, kind: str, produced: dict, metrics: dict,
+                   unavailable: dict) -> list[dict]:
+    """Map our ledger stages onto Stream 5's WorkflowStepper stages.
+
+    A stage counts as done only when its ledger entry ran AND its files exist --
+    the same rule the bundle's own `kind` uses, so the stepper can never show a
+    greener state than the experiment record justifies.
+    """
+    def resolve(pattern: str | None) -> tuple[str | None, dict]:
+        if pattern is None:
+            return None, {}
+        if pattern.endswith("*"):
+            prefix = pattern[:-1]
+            for name, s in stages.items():
+                if name.startswith(prefix):
+                    return name, s
+            return None, {}
+        return (pattern, stages[pattern]) if pattern in stages else (None, {})
+
+    files_for = {
+        "rfdiffusion": produced.get("backbones", 0),
+        "proteinmpnn": produced.get("sequences", 0),
+        "predict_*": produced.get("predictions", 0),
+    }
+
+    rows: list[dict] = []
+    for ui_name, pattern in UI_WORKFLOW:
+        ledger_name, s = resolve(pattern)
+        row: dict = {
+            "stage": ui_name,
+            "ledger_stage": ledger_name,
+            "status": "not_started",
+            "error": None,
+            "outputs": 0,
+            "wall_seconds": None,
+            "preemptions": 0,
+            "note": None,
+        }
+
+        if ui_name == "Structure":
+            row["note"] = ("No input structure: this is de novo design, so the backbone is "
+                           "generated rather than supplied. Nothing is missing.")
+            row["status"] = "not_started"
+        elif ui_name == "Evaluation":
+            have = [k for k in EVALUATION_METRIC_KEYS if k in metrics]
+            if have:
+                row["status"] = "executed" if kind == "executed" else kind
+                row["note"] = "Computed from the bundled files: " + ", ".join(sorted(have)) + "."
+                row["outputs"] = len(have)
+            else:
+                row["status"] = "not_started"
+                row["note"] = ("No evaluation metric could be computed. Reasons are in "
+                               "metrics.json['unavailable'].")
+        elif ui_name == "Candidate review":
+            row["note"] = ("Performed by a person in FoldStudio; the pipeline does not review "
+                           "its own candidates.")
+            row["status"] = "not_started"
+        else:
+            n_files = files_for.get(pattern, 0)
+            row["outputs"] = n_files
+            row["wall_seconds"] = s.get("wall_seconds")
+            row["preemptions"] = s.get("preemptions", 0) or 0
+            if s.get("error"):
+                row["status"] = "failed"
+                row["error"] = s["error"]
+            elif s.get("ran") and n_files > 0:
+                row["status"] = "executed" if kind == "executed" else kind
+            elif n_files > 0:
+                # Files but no ledger: real data, but we did not run it.
+                row["status"] = "imported" if kind != "demo" else "demo"
+                row["note"] = ("Files are present but no ledger entry records this stage running "
+                               "here, so it is not reported as executed.")
+            elif s.get("ran"):
+                row["status"] = "failed"
+                row["error"] = ("the stage ran but produced no output files, and recorded no "
+                                "error explaining why")
+            else:
+                row["status"] = "not_started"
+
+        row["status_label"] = STATUS_LABELS.get(row["status"], row["status"])
+        rows.append(row)
+    return rows
 
 
 def match_backbone(pred_name: str, bb_info: dict) -> str | None:

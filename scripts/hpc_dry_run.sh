@@ -10,8 +10,9 @@
 #   1. runs the stage-machinery tests (checkpoint/resume + a real SIGUSR1 preemption)
 #   2. runs the bundle tests (52 assertions, incl. validation against the backend's
 #      own pydantic Experiment model when backend deps are installed)
-#   3. builds a bundle from the real fixtures and validates it against the contract
-#   4. shows exactly what was and was not measured
+#   4. builds a bundle from the real fixtures and validates it against the contract
+#   5. imports that bundle through Stream 1's real FastAPI app (skips if its deps
+#      are not installed) so cross-stream drift fails loudly
 #
 # The bundle it builds is `kind: "demo"`: no model is executed anywhere in here.
 # Requires: bash, python3 >= 3.7. numpy and pydantic are optional (tests that
@@ -57,7 +58,7 @@ echo "pydantic: $(python3 -c 'import pydantic;print(pydantic.VERSION)' 2>/dev/nu
 hr
 
 echo
-echo "[1/4] fixtures"
+echo "[1/5] fixtures"
 if [ ! -f "${REPO}/hpc/tests/fixtures/proteinmpnn_5L33_example1.fa" ] \
    || [ ! -f "${REPO}/hpc/tests/fixtures/backbone_like_5L33_chainA.pdb" ]; then
   echo "  fixtures missing. Fetch them (needs network):"
@@ -67,7 +68,7 @@ fi
 echo "  present (see hpc/tests/fixtures/PROVENANCE.md for what they are)"
 
 echo
-echo "[2/4] stage machinery: checkpoint, resume, preemption"
+echo "[2/5] stage machinery: checkpoint, resume, preemption"
 if bash "${REPO}/hpc/tests/test_stage_lib.sh" >/tmp/hpc_stage_tests.log 2>&1; then
   tail -2 /tmp/hpc_stage_tests.log | sed 's/^/  /'
 else
@@ -77,7 +78,7 @@ else
 fi
 
 echo
-echo "[3/4] bundle writer and contract validation"
+echo "[3/5] bundle writer and contract validation"
 if python3 "${REPO}/hpc/tests/test_export_bundle.py" >/tmp/hpc_bundle_tests.log 2>&1; then
   grep -E '^(Ran|OK)' /tmp/hpc_bundle_tests.log | sed 's/^/  /'
   if grep -q 'skipped' /tmp/hpc_bundle_tests.log; then
@@ -91,7 +92,7 @@ else
 fi
 
 echo
-echo "[4/4] building a demo bundle from the real fixtures"
+echo "[4/5] building a demo bundle from the real fixtures"
 EXTRA=()
 [ -n "${PREDICTED}" ] && EXTRA=(--predicted "${PREDICTED}")
 if python3 "${REPO}/hpc/export_bundle.py" --dry-run --data-dir "${DATA_DIR}" \
@@ -112,6 +113,17 @@ for k, v in sorted(d["unavailable"].items()):
 PY
 else
   echo "  FAILED to build the demo bundle"
+  FAILED=1
+fi
+
+echo
+echo "[5/5] cross-stream contract: does the bundle still import into Stream 1's API?"
+if python3 "${REPO}/scripts/hpc_check_contract.py" >/tmp/hpc_contract.log 2>&1; then
+  tail -3 /tmp/hpc_contract.log | sed 's/^/  /'
+else
+  echo "  FAILED -- a cross-stream assumption changed:"
+  grep -E '^(  FAIL|  - )' /tmp/hpc_contract.log | sed 's/^/  /' || true
+  echo "  (full log: /tmp/hpc_contract.log)"
   FAILED=1
 fi
 

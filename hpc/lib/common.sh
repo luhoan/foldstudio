@@ -293,6 +293,89 @@ fs_stage_end_trap() {
   return 0
 }
 
+# --------------------------------------------------------- partition preflight
+# Convert a Slurm time string to seconds.
+#   -1 = no limit (UNLIMITED/INFINITE), -2 = unparseable
+# Slurm writes MaxTime as minutes, mm:ss, hh:mm:ss, d-hh, d-hh:mm or d-hh:mm:ss.
+fs_time_to_seconds() {
+  python3 - "${1:-}" <<'PY'
+import re, sys
+s = (sys.argv[1] or "").strip().upper()
+if s in ("", "UNLIMITED", "INFINITE", "NONE", "N/A"):
+    print(-1); raise SystemExit(0)
+days = 0
+if "-" in s:
+    d, _, s = s.partition("-")
+    if not d.isdigit():
+        print(-2); raise SystemExit(0)
+    days = int(d)
+parts = s.split(":") if s else ["0"]
+if not all(p.isdigit() for p in parts if p != ""):
+    print(-2); raise SystemExit(0)
+nums = [int(p) for p in parts]
+if len(nums) == 1:
+    # bare number: minutes without a day part, hours with one
+    secs = nums[0] * 3600 if days else nums[0] * 60
+elif len(nums) == 2:
+    # d-hh:mm  ->  hours:minutes ; mm:ss without a day part
+    secs = nums[0] * 3600 + nums[1] * 60 if days else nums[0] * 60 + nums[1]
+elif len(nums) == 3:
+    secs = nums[0] * 3600 + nums[1] * 60 + nums[2]
+else:
+    print(-2); raise SystemExit(0)
+print(days * 86400 + secs)
+PY
+}
+
+# fs_partition_exists <name>
+fs_partition_exists() {
+  command -v scontrol >/dev/null 2>&1 || return 2
+  scontrol show partition "$1" >/dev/null 2>&1
+}
+
+# fs_partition_max_seconds <name> -- real MaxTime from scontrol
+fs_partition_max_seconds() {
+  local raw
+  raw="$(scontrol show partition "$1" 2>/dev/null | tr ' ' '\n' | sed -n 's/^MaxTime=//p' | head -1)"
+  fs_time_to_seconds "${raw}"
+}
+
+# fs_partition_gres <name> -- GRES advertised by this partition's nodes, or empty
+fs_partition_gres() {
+  command -v sinfo >/dev/null 2>&1 || return 0
+  sinfo -h -p "$1" -o '%G' 2>/dev/null | sort -u | tr '\n' ' '
+}
+
+# fs_check_walltime <partition> <requested-time> <label>
+# Refuse to submit a job the partition will never schedule. A job asking for more
+# than MaxTime is rejected by sbatch (or sits PENDING forever), which on a short
+# coursework partition is an easy and expensive mistake.
+fs_check_walltime() {
+  local part="$1" want="$2" label="$3"
+  local maxs wants
+  maxs="$(fs_partition_max_seconds "${part}")"
+  wants="$(fs_time_to_seconds "${want}")"
+  if [ "${maxs}" = "-2" ] || [ "${wants}" = "-2" ]; then
+    fs_log "note: could not compare '${want}' against partition ${part} MaxTime; skipping the check"
+    return 0
+  fi
+  if [ "${maxs}" = "-1" ]; then
+    return 0   # no limit
+  fi
+  if [ "${wants}" -gt "${maxs}" ]; then
+    fs_die "${label}: requested --time=${want} ($(( wants / 60 )) min) exceeds partition
+'${part}' MaxTime of $(( maxs / 60 )) min. Slurm will refuse this job or leave it
+pending forever. Lower it, e.g.:
+
+    FS_TIME_GPU=$(printf '%02d:%02d:00' $(( maxs / 3600 )) $(( (maxs % 3600) / 60 )) ) \\
+    FS_TIME_CPU=00:30:00 bash hpc/run_pipeline.sh submit
+
+Every stage checkpoints and resumes, so several short jobs are fine: use
+'bash hpc/run_pipeline.sh resume <RUN_ID>' to continue where a stage left off."
+  fi
+  return 0
+}
+
 # ------------------------------------------------------------------ misc guards
 fs_require_gpu() {
   if ! command -v nvidia-smi >/dev/null 2>&1; then

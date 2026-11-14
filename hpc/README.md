@@ -48,6 +48,7 @@ bash hpc/10_setup_env.sh           # or: 10_setup_env.sh check  (read-only repor
 bash hpc/11_fetch_weights.sh       # or: 11_fetch_weights.sh report
 
 # 3. submit the chain of jobs
+bash hpc/run_pipeline.sh preflight # does this partition allow what we're asking for?
 bash hpc/run_pipeline.sh plan      # print the exact sbatch commands, submit nothing
 bash hpc/run_pipeline.sh submit    # stages 20 -> 30 -> 40 -> 50, chained afterok
 
@@ -65,8 +66,32 @@ bash hpc/run_pipeline.sh export <RUN_ID>
 Verify the whole thing offline first, on any machine, in about a second:
 
 ```bash
-bash scripts/hpc_dry_run.sh
+bash scripts/hpc_dry_run.sh           # tests + a demo bundle
+python scripts/hpc_check_contract.py  # does the bundle still import into Stream 1's API?
 ```
+
+## Which partition? The two briefs disagree
+
+Stream 3's brief said **`requeue`** (free, max 1 day, preemptible). A later
+constraint note said student access is **`class`** only (max 4 hours, intended
+for coursework, acceptable use to be confirmed with ITRSS). Both can't be the
+operating assumption, and only discovery settles it.
+
+Rather than pick one, the pipeline is safe under either:
+
+- `FS_TIME_GPU` defaults to **03:45:00**, which is valid on a 4-hour cap *and* on
+  `requeue`. Every stage checkpoints, so short jobs cost only an extra `resume`.
+- `bash hpc/run_pipeline.sh preflight` reads the partition's **real** `MaxTime`
+  from `scontrol` and **refuses to submit** a job that exceeds it, instead of
+  letting it sit `PENDING` forever. It also warns when the partition advertises
+  no GPU GRES.
+- If the partition has no GPUs, the two GPU stages move off-cluster — see
+  [`OFFLOAD.md`](OFFLOAD.md).
+
+Worth saying plainly: running a protein-design pipeline on a partition *intended
+for coursework* is a policy question, not a technical one. **Send the ITRSS email
+before investing in this path.** If they say no, that is the answer for Stream 3
+regardless of what the GRES column says.
 
 ## Files
 
@@ -80,7 +105,9 @@ bash scripts/hpc_dry_run.sh
 | `30_proteinmpnn.sbatch` | design sequences | no (CPU on purpose) | sbatch |
 | `40_predict.sbatch` | ESMFold or ColabFold | **yes** | sbatch |
 | `50_export.sbatch` | build + tar the bundle | no | sbatch |
-| `run_pipeline.sh` | submit / status / resume / export / plan / dry-run | no | login node |
+| `run_pipeline.sh` | preflight / submit / status / resume / export / plan / dry-run | no | login node |
+| `OFFLOAD.md` | file contract for running the GPU stages off-cluster (Colab/Kaggle/Adroit) | – | docs |
+| `../scripts/hpc_check_contract.py` | imports a bundle through Stream 1's **real** API and fails if a cross-stream assumption broke | no | anywhere |
 | `export_bundle.py` | write `data/experiments/<id>/` | no | anywhere |
 | `predict_esmfold.py` | ESMFold runner (PDB + PAE + real metrics sidecar) | yes | called by stage 40 |
 | `normalize_colabfold.py` | fold ColabFold output into the same contract | no | called by stage 40 |
@@ -268,9 +295,11 @@ as such everywhere in the UI.
 
 | what | how |
 |---|---|
-| `lib/common.sh` + `lib/ledger.py` | `bash hpc/tests/test_stage_lib.sh` — **34/34 pass**, including a real `SIGUSR1` preemption (partial work flushed to `$HOME`, exit 99, no false `stage_end`), a resume pass that redoes **zero** finished items, and a torn ledger line that is skipped rather than fatal |
+| `lib/common.sh` + `lib/ledger.py` | `bash hpc/tests/test_stage_lib.sh` — **36/36 pass**, including a real `SIGUSR1` preemption (partial work flushed to `$HOME`, exit 99, no false `stage_end`), a resume pass that redoes **zero** finished items, and a torn ledger line that is skipped rather than fatal |
 | `export_bundle.py` and its parsers | `python hpc/tests/test_export_bundle.py` — **52/52 pass** |
-| bundle ↔ backend compatibility | a generated bundle is validated against **Stream 1's real pydantic `Experiment` model**, imported from `backend/` |
+| **the bundle actually imports** | `python scripts/hpc_check_contract.py` — **24/24 pass**: boots Stream 1's real FastAPI app over a temp data dir, reindexes the bundle, registers its structures, and confirms `/plddt` returns **409** for a backbone, `/pae` returns **404 pae_unavailable**, and `/jobs` returns **501 no_runner** |
+| bundle ↔ backend compatibility | also validated directly against **Stream 1's real pydantic `Experiment` model** |
+| the wall-time guard | `fs_time_to_seconds` covers every `MaxTime` format `scontrol` prints; the guard was exercised against a simulated 4-hour `class` partition (8 h request rejected, 3:45 default accepted, no-GPU warning raised) |
 | RMSD arithmetic | checked on real coordinates under known rigid transforms (rotation + translation → 0; alternating displacement → the right magnitude) |
 | the validator itself | 10 tests mutate a good bundle and confirm each violation is caught |
 | ProteinMPNN output parsing | against a **genuine ProteinMPNN output** committed upstream; parsed scores match its own headers (0.8221 / 0.8356 → mean 0.8289) |
@@ -340,23 +369,28 @@ and would otherwise be reported as confidence.
 
 ## Known gaps and risks
 
-1. **Apptainer is configured but not wired through.** `fs_activate_env` validates
+1. **The off-cluster path is documented but unexercised.** `OFFLOAD.md` describes
+   the exact file and ledger contract, derived from what `export_bundle.py`
+   actually reads (which is tested), but nobody has run RFdiffusion on Colab and
+   walked a bundle through it. There is no notebook yet — deliberately, until
+   discovery says whether one is needed.
+2. **Apptainer is configured but not wired through.** `fs_activate_env` validates
    the image, but the stage scripts call `python` directly rather than
    `apptainer exec`. Use conda, or add the wrapper, before relying on
    `FS_ENV_MODE=apptainer`.
-2. **ColabFold is the less-tested predictor.** `normalize_colabfold.py` has never
+3. **ColabFold is the less-tested predictor.** `normalize_colabfold.py` has never
    seen real ColabFold output. ESMFold is the primary path; if ESMFold's OpenFold
    build defeats you, run `normalize_colabfold.py --list-only` first.
-3. **`FS_NUM_DESIGNS` is not enforced as a completion condition.** Stage 20 exits
+4. **`FS_NUM_DESIGNS` is not enforced as a completion condition.** Stage 20 exits
    0 when it produced *at least one* backbone, leaving `resume` to finish the
    rest. That is intentional on a preemptible partition, but it means "stage 20
    succeeded" does not mean "all designs exist" — check `status`.
-4. **`inference.write_trajectory=False`** keeps the 50 GB home quota safe but
+5. **`inference.write_trajectory=False`** keeps the 50 GB home quota safe but
    discards the diffusion trajectories. Flip it in `FS_RFD_EXTRA_ARGS` if you
    want them.
-5. **No TM-score.** The bundle reports CA RMSD only. `POST /api/analysis/align`
+6. **No TM-score.** The bundle reports CA RMSD only. `POST /api/analysis/align`
    (Stream 1) is the place to get TM-score between registered structures.
-6. **Multi-chain is unhandled.** Everything assumes a single chain `A`, which is
+7. **Multi-chain is unhandled.** Everything assumes a single chain `A`, which is
    what an unconditional monomer design produces.
 
 ## Configuration

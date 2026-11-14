@@ -1,0 +1,112 @@
+{
+  "created_at": "2026-11-14T07:01:15+00:00",
+  "error": null,
+  "id": "hpc_demo_example",
+  "inputs": [],
+  "kind": "demo",
+  "metrics": {
+    "backbone_n_residues_max": 106,
+    "backbone_n_residues_min": 106,
+    "mpnn_best_score": 0.8221,
+    "mpnn_mean_score": 0.8289,
+    "mpnn_mean_seq_recovery": 0.4764,
+    "mpnn_model_name": "v_48_020",
+    "mpnn_seed": 37,
+    "n_backbones": 1,
+    "n_sequences_designed": 2
+  },
+  "metrics_unavailable": {
+    "predicted_best_mean_plddt": "the dry run was given no real predicted model. No pLDDT-bearing prediction is bundled with the repo, and inventing B-factors and calling them pLDDT is not acceptable. Pass --predicted <real predicted model> to exercise this path.",
+    "predicted_mean_plddt": "the dry run was given no real predicted model. No pLDDT-bearing prediction is bundled with the repo, and inventing B-factors and calling them pLDDT is not acceptable. Pass --predicted <real predicted model> to exercise this path.",
+    "predicted_mean_ptm": "the dry run was given no real predicted model. No pLDDT-bearing prediction is bundled with the repo, and inventing B-factors and calling them pLDDT is not acceptable. Pass --predicted <real predicted model> to exercise this path.",
+    "self_consistency_ca_rmsd_best": "the dry run was given no real predicted model. No pLDDT-bearing prediction is bundled with the repo, and inventing B-factors and calling them pLDDT is not acceptable. Pass --predicted <real predicted model> to exercise this path.",
+    "self_consistency_ca_rmsd_mean": "the dry run was given no real predicted model. No pLDDT-bearing prediction is bundled with the repo, and inventing B-factors and calling them pLDDT is not acceptable. Pass --predicted <real predicted model> to exercise this path."
+  },
+  "model_name": "FoldStudio HPC pipeline (dry run: no model was executed)",
+  "model_version": "ProteinMPNN model v_48_020; ProteinMPNN git_hash(from FASTA)=015ff820b9b5",
+  "outputs": [
+    "structures/backbone_like_5L33_chainA.pdb",
+    "sequences/proteinmpnn_5L33_example1.fa"
+  ],
+  "per_design": [],
+  "provenance": {
+    "notes": "DRY RUN. No model was executed. The files here are real public data used to validate the bundle format: a real ProteinMPNN output committed by its authors, and a real coordinate excerpt of PDB 5L33 chain A standing in for a designed backbone. See hpc/tests/fixtures/PROVENANCE.md. Nothing here is evidence about any designed protein, and the ProteinMPNN scores are upstream's own numbers for 5L33. pLDDT, PAE and pTM are the model's own confidence estimates. They are not evidence of folding, binding, affinity, efficacy, safety or biological function. FoldStudio is not a clinical tool and this bundle is not evidence for any therapeutic use. No binder or therapeutic design was performed: the design target is an unconditional monomeric scaffold with no binding partner.",
+    "retrieved_at": "2026-11-14T07:01:15+00:00",
+    "source": "FoldStudio HPC pipeline dry run (no execution)",
+    "url": null
+  },
+  "settings": {
+    "dry_run": true,
+    "rfdiffusion_seed_mechanism": "inference.deterministic=True; RFdiffusion's stock config exposes no per-design seed, so a design regenerated after a preemption is not guaranteed bit-identical to the same index inside one uninterrupted multi-design run."
+  },
+  "stage_summary": {},
+  "status": "ok",
+  "workflow": [
+    {
+      "error": null,
+      "ledger_stage": null,
+      "note": "No input structure: this is de novo design, so the backbone is generated rather than supplied. Nothing is missing.",
+      "outputs": 0,
+      "preemptions": 0,
+      "stage": "Structure",
+      "status": "not_started",
+      "status_label": "not started",
+      "wall_seconds": null
+    },
+    {
+      "error": null,
+      "ledger_stage": null,
+      "note": "Files are present but no ledger entry records this stage running here, so it is not reported as executed.",
+      "outputs": 1,
+      "preemptions": 0,
+      "stage": "Backbone generation",
+      "status": "demo",
+      "status_label": "demo",
+      "wall_seconds": null
+    },
+    {
+      "error": null,
+      "ledger_stage": null,
+      "note": "Files are present but no ledger entry records this stage running here, so it is not reported as executed.",
+      "outputs": 1,
+      "preemptions": 0,
+      "stage": "Sequence design",
+      "status": "demo",
+      "status_label": "demo",
+      "wall_seconds": null
+    },
+    {
+      "error": null,
+      "ledger_stage": null,
+      "note": null,
+      "outputs": 0,
+      "preemptions": 0,
+      "stage": "Structure prediction",
+      "status": "not_started",
+      "status_label": "not started",
+      "wall_seconds": null
+    },
+    {
+      "error": null,
+      "ledger_stage": null,
+      "note": "Computed from the bundled files: mpnn_best_score, mpnn_mean_score.",
+      "outputs": 2,
+      "preemptions": 0,
+      "stage": "Evaluation",
+      "status": "demo",
+      "status_label": "demo",
+      "wall_seconds": null
+    },
+    {
+      "error": null,
+      "ledger_stage": null,
+      "note": "Performed by a person in FoldStudio; the pipeline does not review its own candidates.",
+      "outputs": 0,
+      "preemptions": 0,
+      "stage": "Candidate review",
+      "status": "not_started",
+      "status_label": "not started",
+      "wall_seconds": null
+    }
+  ]
+}
