@@ -1,0 +1,52 @@
+{
+  "chain": "A",
+  "end": 12,
+  "explanations": [
+    {
+      "refs": [
+        {
+          "name": "source",
+          "unit": null,
+          "value": "experimental"
+        },
+        {
+          "name": "n_residues",
+          "unit": null,
+          "value": 12
+        },
+        {
+          "name": "chain",
+          "unit": null,
+          "value": "A"
+        },
+        {
+          "name": "start",
+          "unit": null,
+          "value": 1
+        },
+        {
+          "name": "end",
+          "unit": null,
+          "value": 12
+        }
+      ],
+      "rule_id": "no_confidence",
+      "text": "Residues 1-12 of chain A (12 residues) come from an experimental structure. No model-confidence scores apply to experimental coordinates: the B-factor column of this file holds experimental B-factors, which are a different quantity from pLDDT, so neither pLDDT nor PAE is reported for it. Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation."
+    }
+  ],
+  "limitations": [
+    "Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation."
+  ],
+  "n_residues": 12,
+  "numbers_used": {
+    "chain": "A",
+    "end": 12,
+    "n_residues": 12,
+    "source": "experimental",
+    "start": 1
+  },
+  "source": "experimental",
+  "start": 1,
+  "structure_id": "st_fixture03",
+  "summary": "Residues 1-12 of chain A (12 residues) come from an experimental structure. No model-confidence scores apply to experimental coordinates: the B-factor column of this file holds experimental B-factors, which are a different quantity from pLDDT, so neither pLDDT nor PAE is reported for it."
+}

@@ -1,0 +1,26 @@
+{
+  "chains": [
+    {
+      "first_resseq": 1,
+      "id": "A",
+      "last_resseq": 6,
+      "n_residues": 6,
+      "sequence": "MKVLAE"
+    }
+  ],
+  "created_at": "2026-01-01T00:00:00Z",
+  "format": "pdb",
+  "has_pae": false,
+  "id": "st_fixture05",
+  "label": "Uploaded fixture (synthetic)",
+  "n_residues": 6,
+  "origin_id": "uploaded.pdb",
+  "provenance": {
+    "notes": "Uploaded file 'uploaded.pdb'. Declared source: uploaded.",
+    "retrieved_at": "2026-01-01T00:00:00Z",
+    "source": "User upload",
+    "url": null
+  },
+  "sha256": "9daf54f771e98fc6eb51b37e749269f0400098e1f7df3dc27aa8c349c28dfde3",
+  "source": "uploaded"
+}

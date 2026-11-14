@@ -1,0 +1,111 @@
+{
+  "chains": [
+    {
+      "first_resseq": 1,
+      "id": "A",
+      "last_resseq": 12,
+      "n_residues": 12,
+      "sequence": "MKVLAEITDFSR"
+    }
+  ],
+  "residues": [
+    {
+      "aa": "M",
+      "chain": "A",
+      "has_ca": true,
+      "icode": "",
+      "resname": "MET",
+      "resseq": 1
+    },
+    {
+      "aa": "K",
+      "chain": "A",
+      "has_ca": true,
+      "icode": "",
+      "resname": "LYS",
+      "resseq": 2
+    },
+    {
+      "aa": "V",
+      "chain": "A",
+      "has_ca": true,
+      "icode": "",
+      "resname": "VAL",
+      "resseq": 3
+    },
+    {
+      "aa": "L",
+      "chain": "A",
+      "has_ca": true,
+      "icode": "",
+      "resname": "LEU",
+      "resseq": 4
+    },
+    {
+      "aa": "A",
+      "chain": "A",
+      "has_ca": true,
+      "icode": "",
+      "resname": "ALA",
+      "resseq": 5
+    },
+    {
+      "aa": "E",
+      "chain": "A",
+      "has_ca": true,
+      "icode": "",
+      "resname": "GLU",
+      "resseq": 6
+    },
+    {
+      "aa": "I",
+      "chain": "A",
+      "has_ca": true,
+      "icode": "",
+      "resname": "ILE",
+      "resseq": 7
+    },
+    {
+      "aa": "T",
+      "chain": "A",
+      "has_ca": true,
+      "icode": "",
+      "resname": "THR",
+      "resseq": 8
+    },
+    {
+      "aa": "D",
+      "chain": "A",
+      "has_ca": true,
+      "icode": "",
+      "resname": "ASP",
+      "resseq": 9
+    },
+    {
+      "aa": "F",
+      "chain": "A",
+      "has_ca": true,
+      "icode": "",
+      "resname": "PHE",
+      "resseq": 10
+    },
+    {
+      "aa": "S",
+      "chain": "A",
+      "has_ca": true,
+      "icode": "",
+      "resname": "SER",
+      "resseq": 11
+    },
+    {
+      "aa": "R",
+      "chain": "A",
+      "has_ca": true,
+      "icode": "",
+      "resname": "ARG",
+      "resseq": 12
+    }
+  ],
+  "source": "predicted",
+  "structure_id": "st_fixture04"
+}

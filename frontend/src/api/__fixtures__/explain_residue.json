@@ -1,0 +1,46 @@
+{
+  "chain": "A",
+  "end": 3,
+  "explanations": [
+    {
+      "refs": [
+        {
+          "name": "plddt",
+          "unit": null,
+          "value": 90.0
+        },
+        {
+          "name": "bin",
+          "unit": null,
+          "value": "very_high"
+        },
+        {
+          "name": "chain",
+          "unit": null,
+          "value": "A"
+        },
+        {
+          "name": "resnum",
+          "unit": null,
+          "value": 3
+        }
+      ],
+      "rule_id": "plddt_residue",
+      "text": "pLDDT 90.0 (90-100): very high local model confidence. This is the model's own estimate of local accuracy for a predicted structure; it is not an experimental observation. Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation."
+    }
+  ],
+  "limitations": [
+    "Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation."
+  ],
+  "n_residues": 1,
+  "numbers_used": {
+    "bin": "very_high",
+    "chain": "A",
+    "plddt": 90.0,
+    "resnum": 3
+  },
+  "source": "predicted",
+  "start": 3,
+  "structure_id": "st_fixture04",
+  "summary": "pLDDT 90.0 (90-100): very high local model confidence. This is the model's own estimate of local accuracy for a predicted structure; it is not an experimental observation."
+}

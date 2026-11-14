@@ -1,0 +1,196 @@
+{
+  "bins": [
+    {
+      "count": 3,
+      "fraction": 0.25,
+      "name": "very_high",
+      "range": ">= 90"
+    },
+    {
+      "count": 3,
+      "fraction": 0.25,
+      "name": "confident",
+      "range": "70 - <90"
+    },
+    {
+      "count": 3,
+      "fraction": 0.25,
+      "name": "low",
+      "range": "50 - <70"
+    },
+    {
+      "count": 3,
+      "fraction": 0.25,
+      "name": "very_low",
+      "range": "< 50"
+    }
+  ],
+  "histogram": [
+    {
+      "count": 0,
+      "hi": 10,
+      "lo": 0
+    },
+    {
+      "count": 0,
+      "hi": 20,
+      "lo": 10
+    },
+    {
+      "count": 1,
+      "hi": 30,
+      "lo": 20
+    },
+    {
+      "count": 1,
+      "hi": 40,
+      "lo": 30
+    },
+    {
+      "count": 1,
+      "hi": 50,
+      "lo": 40
+    },
+    {
+      "count": 2,
+      "hi": 60,
+      "lo": 50
+    },
+    {
+      "count": 1,
+      "hi": 70,
+      "lo": 60
+    },
+    {
+      "count": 2,
+      "hi": 80,
+      "lo": 70
+    },
+    {
+      "count": 1,
+      "hi": 90,
+      "lo": 80
+    },
+    {
+      "count": 3,
+      "hi": 100,
+      "lo": 90
+    }
+  ],
+  "mean": 64.33,
+  "median": 67.5,
+  "n_residues": 12,
+  "note": "pLDDT is the model's own estimate of local structural confidence. It does not establish experimentally observed folding, binding, affinity, safety or biological function.",
+  "per_residue": [
+    {
+      "bin": "very_high",
+      "chain": "A",
+      "icode": "",
+      "label": "A:1",
+      "plddt": 95.0,
+      "resname": "MET",
+      "resseq": 1
+    },
+    {
+      "bin": "very_high",
+      "chain": "A",
+      "icode": "",
+      "label": "A:2",
+      "plddt": 92.0,
+      "resname": "LYS",
+      "resseq": 2
+    },
+    {
+      "bin": "very_high",
+      "chain": "A",
+      "icode": "",
+      "label": "A:3",
+      "plddt": 90.0,
+      "resname": "VAL",
+      "resseq": 3
+    },
+    {
+      "bin": "confident",
+      "chain": "A",
+      "icode": "",
+      "label": "A:4",
+      "plddt": 85.0,
+      "resname": "LEU",
+      "resseq": 4
+    },
+    {
+      "bin": "confident",
+      "chain": "A",
+      "icode": "",
+      "label": "A:5",
+      "plddt": 75.0,
+      "resname": "ALA",
+      "resseq": 5
+    },
+    {
+      "bin": "confident",
+      "chain": "A",
+      "icode": "",
+      "label": "A:6",
+      "plddt": 70.0,
+      "resname": "GLU",
+      "resseq": 6
+    },
+    {
+      "bin": "low",
+      "chain": "A",
+      "icode": "",
+      "label": "A:7",
+      "plddt": 65.0,
+      "resname": "ILE",
+      "resseq": 7
+    },
+    {
+      "bin": "low",
+      "chain": "A",
+      "icode": "",
+      "label": "A:8",
+      "plddt": 55.0,
+      "resname": "THR",
+      "resseq": 8
+    },
+    {
+      "bin": "low",
+      "chain": "A",
+      "icode": "",
+      "label": "A:9",
+      "plddt": 50.0,
+      "resname": "ASP",
+      "resseq": 9
+    },
+    {
+      "bin": "very_low",
+      "chain": "A",
+      "icode": "",
+      "label": "A:10",
+      "plddt": 45.0,
+      "resname": "PHE",
+      "resseq": 10
+    },
+    {
+      "bin": "very_low",
+      "chain": "A",
+      "icode": "",
+      "label": "A:11",
+      "plddt": 30.0,
+      "resname": "SER",
+      "resseq": 11
+    },
+    {
+      "bin": "very_low",
+      "chain": "A",
+      "icode": "",
+      "label": "A:12",
+      "plddt": 20.0,
+      "resname": "ARG",
+      "resseq": 12
+    }
+  ],
+  "source": "predicted",
+  "structure_id": "st_fixture04"
+}

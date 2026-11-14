@@ -1,0 +1,94 @@
+{
+  "atom_selection": "heavy atoms of amino-acid residues, modified residues (e.g. MSE) included",
+  "cutoff_angstrom": 4.5,
+  "interfaces": [
+    {
+      "chain_a": "A",
+      "chain_b": "B",
+      "explanation": {
+        "refs": [
+          {
+            "name": "structure",
+            "unit": null,
+            "value": "Fixture complex (synthetic, two chains)"
+          },
+          {
+            "name": "chain_a",
+            "unit": null,
+            "value": "A"
+          },
+          {
+            "name": "chain_b",
+            "unit": null,
+            "value": "B"
+          },
+          {
+            "name": "n_contacts",
+            "unit": null,
+            "value": 26
+          },
+          {
+            "name": "cutoff",
+            "unit": "A",
+            "value": 4.5
+          }
+        ],
+        "rule_id": "interface",
+        "text": "Interface between chain A and chain B in experimental entry Fixture complex (synthetic, two chains): 26 residue pairs with heavy atoms within 4.5 A, computed from the deposited coordinates. No model-confidence scores apply to experimental coordinates. Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation."
+      },
+      "interface_mean_plddt": null,
+      "mean_interchain_pae": null,
+      "n_residue_pairs": 26,
+      "n_residues_a": 12,
+      "n_residues_b": 12,
+      "ranges_a": [
+        {
+          "end": 12,
+          "start": 1
+        }
+      ],
+      "ranges_b": [
+        {
+          "end": 112,
+          "start": 101
+        }
+      ],
+      "residues_a": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "residues_b": [
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112
+      ]
+    }
+  ],
+  "limitations": [
+    "Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation."
+  ],
+  "n_chains": 2,
+  "note": "Contacts are geometric: residue pairs on different chains with any heavy atoms within the cutoff, in this one set of coordinates. They are not measurements of any physical property.",
+  "pae_note": "mean_interchain_pae averages both directions, PAE(i in A, j in B) and PAE(j in B, i in A); it is null when the structure has no PAE.",
+  "source": "experimental",
+  "structure_id": "st_fixture03"
+}

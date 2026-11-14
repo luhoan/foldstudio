@@ -1,0 +1,338 @@
+{
+  "experiments": [
+    {
+      "bundle": {
+        "dir": "imported-fixture-predicted",
+        "path": "experiments/imported-fixture-predicted"
+      },
+      "created_at": "2026-01-01T00:00:00Z",
+      "entry": {
+        "label": "Fixture model (synthetic, with PAE)",
+        "reason": "Synthetic fixture for frontend tests. Not a real structure, model or run.",
+        "title_from_entry": "Synthetic twelve-residue helix"
+      },
+      "error": null,
+      "id": "imported-fixture-predicted",
+      "inputs": [
+        "fixture-predicted"
+      ],
+      "kind": "imported",
+      "metrics": {
+        "mean_plddt_ca": 64.333,
+        "n_chains": 1,
+        "n_residues": 12
+      },
+      "model_name": "AlphaFold DB (precomputed)",
+      "model_version": "4",
+      "outputs": [
+        {
+          "label": "Fixture model (synthetic, with PAE)",
+          "path": "structures/fixture-predicted.pdb",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "source": "predicted",
+          "type": "structure"
+        },
+        {
+          "path": "structures/fixture-predicted.pae.json",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "type": "pae"
+        }
+      ],
+      "provenance": {
+        "notes": "Synthetic fixture for frontend tests. Not a real structure, model or run.",
+        "retrieved_at": "2026-01-01T00:00:00Z",
+        "source": "fixture",
+        "url": null
+      },
+      "settings": {},
+      "status": "ok"
+    },
+    {
+      "bundle": {
+        "dir": "hpc_fixture_run",
+        "path": "experiments/hpc_fixture_run"
+      },
+      "created_at": "2026-01-01T00:00:00Z",
+      "error": "Synthetic fixture: one stage is shown as failed so the UI's failure path is exercised.",
+      "id": "hpc_fixture_run",
+      "inputs": [],
+      "kind": "executed",
+      "metric_definitions": {
+        "mpnn_best_score": "Lowest ProteinMPNN score= value among designed sequences; lower is better.",
+        "predicted_best_mean_plddt": "Highest mean pLDDT among the predicted structures of designed sequences.",
+        "self_consistency_ca_rmsd_best": "Lowest CA RMSD between a predicted structure and the backbone it was designed for, after optimal superposition."
+      },
+      "metrics": {
+        "mpnn_best_score": 0.9,
+        "mpnn_model_name": "v_48_020",
+        "n_backbones": 1,
+        "n_predicted_structures": 1,
+        "n_sequences_designed": 1,
+        "predicted_best_mean_plddt": 64.33,
+        "self_consistency_ca_rmsd_best": 0.0
+      },
+      "metrics_unavailable": {
+        "predicted_mean_ptm": "the predictor did not return a pTM value"
+      },
+      "model_name": "RFdiffusion + ProteinMPNN + ESMFold",
+      "model_version": "fixture",
+      "outputs": [
+        "structures/design_0.pdb",
+        "sequences/design_0.fa",
+        "structures/design_0_s1.pdb",
+        "structures/design_0_s1.pae.json"
+      ],
+      "provenance": {
+        "notes": "Synthetic fixture for frontend tests. Not a real structure, model or run.",
+        "retrieved_at": "2026-01-01T00:00:00Z",
+        "source": "fixture",
+        "url": null
+      },
+      "settings": {
+        "contig": "12-12",
+        "num_designs": 1,
+        "seed": 37
+      },
+      "status": "partial",
+      "structure_labels": {
+        "design_0.pdb": "design_0 (RFdiffusion backbone; no sequence, no confidence)",
+        "design_0_s1.pdb": "design_0_s1 (predicted structure)"
+      },
+      "structure_sources": {
+        "design_0.pdb": "uploaded",
+        "design_0_s1.pdb": "predicted"
+      },
+      "workflow": [
+        {
+          "error": null,
+          "ledger_stage": null,
+          "note": "No input structure: this is de novo design, so the backbone is generated rather than supplied.",
+          "outputs": 0,
+          "preemptions": 0,
+          "stage": "Structure",
+          "status": "not_started",
+          "status_label": "not started",
+          "wall_seconds": null
+        },
+        {
+          "error": null,
+          "ledger_stage": "rfdiffusion",
+          "note": null,
+          "outputs": 1,
+          "preemptions": 0,
+          "stage": "Backbone generation",
+          "status": "executed",
+          "status_label": "executed",
+          "wall_seconds": 70.4
+        },
+        {
+          "error": null,
+          "ledger_stage": "proteinmpnn",
+          "note": null,
+          "outputs": 1,
+          "preemptions": 1,
+          "stage": "Sequence design",
+          "status": "executed",
+          "status_label": "executed",
+          "wall_seconds": 4.3
+        },
+        {
+          "error": "Synthetic fixture: stage marked failed for the failure-path test.",
+          "ledger_stage": "predict_esmfold",
+          "note": null,
+          "outputs": 1,
+          "preemptions": 0,
+          "stage": "Structure prediction",
+          "status": "failed",
+          "status_label": "failed",
+          "wall_seconds": 12.0
+        },
+        {
+          "error": null,
+          "ledger_stage": "export_bundle",
+          "note": "Some metrics were measured and one was not.",
+          "outputs": 0,
+          "preemptions": 0,
+          "stage": "Evaluation",
+          "status": "partial",
+          "status_label": "partial",
+          "wall_seconds": null
+        },
+        {
+          "error": null,
+          "ledger_stage": null,
+          "note": "Review happens in the app, not in the pipeline.",
+          "outputs": 0,
+          "preemptions": 0,
+          "stage": "Candidate review",
+          "status": "not_started",
+          "status_label": "not started",
+          "wall_seconds": null
+        }
+      ]
+    }
+  ],
+  "fields": [
+    {
+      "differs": true,
+      "field": "kind",
+      "values": {
+        "hpc_fixture_run": "executed",
+        "imported-fixture-predicted": "imported"
+      }
+    },
+    {
+      "differs": true,
+      "field": "status",
+      "values": {
+        "hpc_fixture_run": "partial",
+        "imported-fixture-predicted": "ok"
+      }
+    },
+    {
+      "differs": true,
+      "field": "model_name",
+      "values": {
+        "hpc_fixture_run": "RFdiffusion + ProteinMPNN + ESMFold",
+        "imported-fixture-predicted": "AlphaFold DB (precomputed)"
+      }
+    },
+    {
+      "differs": true,
+      "field": "model_version",
+      "values": {
+        "hpc_fixture_run": "fixture",
+        "imported-fixture-predicted": "4"
+      }
+    },
+    {
+      "differs": true,
+      "field": "error",
+      "values": {
+        "hpc_fixture_run": "Synthetic fixture: one stage is shown as failed so the UI's failure path is exercised.",
+        "imported-fixture-predicted": null
+      }
+    },
+    {
+      "differs": false,
+      "field": "provenance.source",
+      "values": {
+        "hpc_fixture_run": "fixture",
+        "imported-fixture-predicted": "fixture"
+      }
+    }
+  ],
+  "ids": [
+    "imported-fixture-predicted",
+    "hpc_fixture_run"
+  ],
+  "metrics": [
+    {
+      "differs": true,
+      "field": "mean_plddt_ca",
+      "values": {
+        "hpc_fixture_run": null,
+        "imported-fixture-predicted": 64.333
+      }
+    },
+    {
+      "differs": true,
+      "field": "mpnn_best_score",
+      "values": {
+        "hpc_fixture_run": 0.9,
+        "imported-fixture-predicted": null
+      }
+    },
+    {
+      "differs": true,
+      "field": "mpnn_model_name",
+      "values": {
+        "hpc_fixture_run": "v_48_020",
+        "imported-fixture-predicted": null
+      }
+    },
+    {
+      "differs": true,
+      "field": "n_backbones",
+      "values": {
+        "hpc_fixture_run": 1,
+        "imported-fixture-predicted": null
+      }
+    },
+    {
+      "differs": true,
+      "field": "n_chains",
+      "values": {
+        "hpc_fixture_run": null,
+        "imported-fixture-predicted": 1
+      }
+    },
+    {
+      "differs": true,
+      "field": "n_predicted_structures",
+      "values": {
+        "hpc_fixture_run": 1,
+        "imported-fixture-predicted": null
+      }
+    },
+    {
+      "differs": true,
+      "field": "n_residues",
+      "values": {
+        "hpc_fixture_run": null,
+        "imported-fixture-predicted": 12
+      }
+    },
+    {
+      "differs": true,
+      "field": "n_sequences_designed",
+      "values": {
+        "hpc_fixture_run": 1,
+        "imported-fixture-predicted": null
+      }
+    },
+    {
+      "differs": true,
+      "field": "predicted_best_mean_plddt",
+      "values": {
+        "hpc_fixture_run": 64.33,
+        "imported-fixture-predicted": null
+      }
+    },
+    {
+      "differs": true,
+      "field": "self_consistency_ca_rmsd_best",
+      "values": {
+        "hpc_fixture_run": 0.0,
+        "imported-fixture-predicted": null
+      }
+    }
+  ],
+  "note": "Values are shown as recorded; a null means the experiment did not record that field. Metrics from different models or kinds are not directly comparable evidence.",
+  "settings": [
+    {
+      "differs": true,
+      "field": "contig",
+      "values": {
+        "hpc_fixture_run": "12-12",
+        "imported-fixture-predicted": null
+      }
+    },
+    {
+      "differs": true,
+      "field": "num_designs",
+      "values": {
+        "hpc_fixture_run": 1,
+        "imported-fixture-predicted": null
+      }
+    },
+    {
+      "differs": true,
+      "field": "seed",
+      "values": {
+        "hpc_fixture_run": 37,
+        "imported-fixture-predicted": null
+      }
+    }
+  ]
+}

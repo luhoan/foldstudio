@@ -1,0 +1,172 @@
+{
+  "aligned_atoms": 12,
+  "aligned_residues": 12,
+  "atom_type": "CA",
+  "explanations": [
+    {
+      "refs": [
+        {
+          "name": "rmsd",
+          "unit": "A",
+          "value": 0.0
+        },
+        {
+          "name": "aligned_atoms",
+          "unit": null,
+          "value": 12
+        },
+        {
+          "name": "aligned_residues",
+          "unit": null,
+          "value": 12
+        },
+        {
+          "name": "atom_type",
+          "unit": null,
+          "value": "CA"
+        },
+        {
+          "name": "mobile",
+          "unit": null,
+          "value": "design_0_s1 (predicted structure)"
+        },
+        {
+          "name": "reference",
+          "unit": null,
+          "value": "design_0 (RFdiffusion backbone; no sequence, no confidence)"
+        },
+        {
+          "name": "tm_score",
+          "unit": null,
+          "value": 1.0
+        }
+      ],
+      "rule_id": "alignment",
+      "text": "Root-mean-square deviation (RMSD) 0.00 A, computed on 12 CA atoms from 12 aligned residues (mobile: design_0_s1 (predicted structure), reference: design_0 (RFdiffusion backbone; no sequence, no confidence)). RMSD measures average positional difference over only those atoms, and is sensitive to outlier regions and to which atoms were selected. Only 12 atoms were aligned, so this RMSD describes a very small part of the structure. TM-score 1.000. TM-score is a length-normalised structural similarity measure between 0 and 1; higher means greater similarity of the aligned backbones. It does not describe function. Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation."
+    }
+  ],
+  "limitations": [
+    "Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation."
+  ],
+  "matching": "resnum",
+  "matching_requested": "auto",
+  "matrix": [
+    [
+      1.0,
+      0.0,
+      -0.0,
+      0.0
+    ],
+    [
+      0.0,
+      1.0,
+      -0.0,
+      0.0
+    ],
+    [
+      0.0,
+      -0.0,
+      1.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "matrix_convention": "4x4 column-vector transform mapping mobile coordinates into the reference frame",
+  "mobile_chain": "A",
+  "mobile_id": "st_fixture02",
+  "mobile_label": "design_0_s1 (predicted structure)",
+  "mobile_residues_in_selection": 12,
+  "mobile_source": "predicted",
+  "notes": [
+    "Residue matching was chosen automatically: sequence alignment paired 12 residue(s) at 0% identity, too little to rely on, so residues were paired by residue number instead (12 pairs). This assumes both structures use the same residue numbering.",
+    "RMSD depends on which residues are matched; low-confidence or disordered regions are included unless excluded via the selection ranges.",
+    "RMSD and TM-score measure geometric similarity only, not function or binding."
+  ],
+  "numbers_used": {
+    "aligned_atoms": 12,
+    "aligned_residues": 12,
+    "atom_type": "CA",
+    "mobile": "design_0_s1 (predicted structure)",
+    "reference": "design_0 (RFdiffusion backbone; no sequence, no confidence)",
+    "rmsd": 0.0,
+    "tm_score": 1.0
+  },
+  "pairs": [
+    {
+      "identical": false,
+      "mobile": "A:1",
+      "reference": "A:1"
+    },
+    {
+      "identical": false,
+      "mobile": "A:2",
+      "reference": "A:2"
+    },
+    {
+      "identical": false,
+      "mobile": "A:3",
+      "reference": "A:3"
+    },
+    {
+      "identical": false,
+      "mobile": "A:4",
+      "reference": "A:4"
+    },
+    {
+      "identical": false,
+      "mobile": "A:5",
+      "reference": "A:5"
+    },
+    {
+      "identical": false,
+      "mobile": "A:6",
+      "reference": "A:6"
+    },
+    {
+      "identical": false,
+      "mobile": "A:7",
+      "reference": "A:7"
+    },
+    {
+      "identical": false,
+      "mobile": "A:8",
+      "reference": "A:8"
+    },
+    {
+      "identical": false,
+      "mobile": "A:9",
+      "reference": "A:9"
+    },
+    {
+      "identical": false,
+      "mobile": "A:10",
+      "reference": "A:10"
+    },
+    {
+      "identical": false,
+      "mobile": "A:11",
+      "reference": "A:11"
+    },
+    {
+      "identical": false,
+      "mobile": "A:12",
+      "reference": "A:12"
+    }
+  ],
+  "procedure": "Single optimal rigid-body (Kabsch) superposition of matched CA atoms; no outlier rejection or iterative refinement for RMSD.",
+  "reference_chain": "A",
+  "reference_id": "st_fixture01",
+  "reference_label": "design_0 (RFdiffusion backbone; no sequence, no confidence)",
+  "reference_residues_in_selection": 12,
+  "reference_source": "uploaded",
+  "rmsd": 0.0,
+  "sequence_identity": 0.0,
+  "summary": "Root-mean-square deviation (RMSD) 0.00 A, computed on 12 CA atoms from 12 aligned residues (mobile: design_0_s1 (predicted structure), reference: design_0 (RFdiffusion backbone; no sequence, no confidence)). RMSD measures average positional difference over only those atoms, and is sensitive to outlier regions and to which atoms were selected. Only 12 atoms were aligned, so this RMSD describes a very small part of the structure. TM-score 1.000. TM-score is a length-normalised structural similarity measure between 0 and 1; higher means greater similarity of the aligned backbones. It does not describe function.",
+  "tm_score": 1.0,
+  "tm_score_method": "FoldStudio built-in: TM-score for the fixed matched-residue correspondence, heuristic superposition search, normalised by reference chain length (CA count). May slightly underestimate official TM-score/USalign values; USalign was not available."
+}

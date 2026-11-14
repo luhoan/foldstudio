@@ -1,0 +1,22 @@
+{
+  "data_dir": "<data-dir>",
+  "reindex": {
+    "at": "2026-01-01T00:00:00Z",
+    "errors": [],
+    "imported": [
+      "hpc_fixture_run",
+      "imported-fixture-complex",
+      "imported-fixture-predicted"
+    ],
+    "removed": [],
+    "structures_registered": [
+      "st_fixture01",
+      "st_fixture02",
+      "st_fixture03",
+      "st_fixture04"
+    ],
+    "structures_updated": []
+  },
+  "runners": [],
+  "status": "ok"
+}

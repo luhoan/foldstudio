@@ -1,0 +1,115 @@
+{
+  "chain": "A",
+  "end": 12,
+  "explanations": [
+    {
+      "refs": [
+        {
+          "name": "mean_plddt",
+          "unit": null,
+          "value": 64.333
+        },
+        {
+          "name": "n_residues",
+          "unit": null,
+          "value": 12
+        },
+        {
+          "name": "chain",
+          "unit": null,
+          "value": "A"
+        },
+        {
+          "name": "start",
+          "unit": null,
+          "value": 1
+        },
+        {
+          "name": "end",
+          "unit": null,
+          "value": 12
+        },
+        {
+          "name": "fraction_very_high",
+          "unit": null,
+          "value": 0.25
+        },
+        {
+          "name": "fraction_high",
+          "unit": null,
+          "value": 0.25
+        },
+        {
+          "name": "fraction_low",
+          "unit": null,
+          "value": 0.25
+        },
+        {
+          "name": "fraction_very_low",
+          "unit": null,
+          "value": 0.25
+        }
+      ],
+      "rule_id": "plddt_region",
+      "text": "Residues 1-12 of chain A (12 residues): mean pLDDT 64.3. Fraction of residues by bin: very high local model confidence 25%; relatively high local model confidence 25%; low local model confidence 25%; very low local model confidence 25%. These are model confidence values from a predicted structure. Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation."
+    },
+    {
+      "refs": [
+        {
+          "name": "mean_pae",
+          "unit": "A",
+          "value": 4.354
+        },
+        {
+          "name": "max_pae",
+          "unit": "A",
+          "value": 9.75
+        },
+        {
+          "name": "n_pairs",
+          "unit": null,
+          "value": 144
+        },
+        {
+          "name": "chain",
+          "unit": null,
+          "value": "A"
+        },
+        {
+          "name": "start",
+          "unit": null,
+          "value": 1
+        },
+        {
+          "name": "end",
+          "unit": null,
+          "value": 12
+        }
+      ],
+      "rule_id": "pae_region",
+      "text": "Predicted aligned error (PAE) for residues 1-12 of chain A: mean 4.4 A, maximum 9.8 A across 144 residue pairs. PAE is the model's estimate of the expected position error of one residue when the structure is aligned on another, so it is a relative uncertainty between residue pairs. Lower values mean lower predicted relative uncertainty. Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation."
+    }
+  ],
+  "limitations": [
+    "Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation."
+  ],
+  "n_residues": 12,
+  "numbers_used": {
+    "chain": "A",
+    "end": 12,
+    "fraction_high": 0.25,
+    "fraction_low": 0.25,
+    "fraction_very_high": 0.25,
+    "fraction_very_low": 0.25,
+    "max_pae": 9.75,
+    "mean_pae": 4.354,
+    "mean_plddt": 64.333,
+    "n_pairs": 144,
+    "n_residues": 12,
+    "start": 1
+  },
+  "source": "predicted",
+  "start": 1,
+  "structure_id": "st_fixture04",
+  "summary": "Residues 1-12 of chain A (12 residues): mean pLDDT 64.3. Fraction of residues by bin: very high local model confidence 25%; relatively high local model confidence 25%; low local model confidence 25%; very low local model confidence 25%. These are model confidence values from a predicted structure. Predicted aligned error (PAE) for residues 1-12 of chain A: mean 4.4 A, maximum 9.8 A across 144 residue pairs. PAE is the model's estimate of the expected position error of one residue when the structure is aligned on another, so it is a relative uncertainty between residue pairs. Lower values mean lower predicted relative uncertainty."
+}

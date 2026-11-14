@@ -1,0 +1,117 @@
+[
+  {
+    "chains": [
+      {
+        "first_resseq": 1,
+        "id": "A",
+        "last_resseq": 12,
+        "n_residues": 12,
+        "sequence": "GGGGGGGGGGGG"
+      }
+    ],
+    "created_at": "2026-01-01T00:00:00Z",
+    "format": "pdb",
+    "has_pae": false,
+    "id": "st_fixture01",
+    "label": "design_0 (RFdiffusion backbone; no sequence, no confidence)",
+    "n_residues": 12,
+    "origin_id": "hpc_fixture_run:design_0.pdb",
+    "provenance": {
+      "experiment_id": "hpc_fixture_run",
+      "notes": "Registered automatically from the experiment bundle that lists it as an output. Source 'uploaded' is as the bundle declared it; it was not inferred from the file.",
+      "retrieved_at": "2026-01-01T00:00:00Z",
+      "source": "experiment:hpc_fixture_run",
+      "url": null
+    },
+    "sha256": "f9bf07d601633e5f55fcad3a3fa03a9328a01615362813c0a2d8837cabcde2b1",
+    "source": "uploaded"
+  },
+  {
+    "chains": [
+      {
+        "first_resseq": 1,
+        "id": "A",
+        "last_resseq": 12,
+        "n_residues": 12,
+        "sequence": "MKVLAEITDFSR"
+      }
+    ],
+    "created_at": "2026-01-01T00:00:00Z",
+    "format": "pdb",
+    "has_pae": true,
+    "id": "st_fixture02",
+    "label": "design_0_s1 (predicted structure)",
+    "n_residues": 12,
+    "origin_id": "hpc_fixture_run:design_0_s1.pdb",
+    "provenance": {
+      "experiment_id": "hpc_fixture_run",
+      "notes": "Registered automatically from the experiment bundle that lists it as an output. Source 'predicted' is as the bundle declared it; it was not inferred from the file.",
+      "retrieved_at": "2026-01-01T00:00:00Z",
+      "source": "experiment:hpc_fixture_run",
+      "url": null
+    },
+    "sha256": "5289bd1ccd2ed08fa439740588accd83eb2d32862bc0b6a9cb45e71a4b6eeb5b",
+    "source": "predicted"
+  },
+  {
+    "chains": [
+      {
+        "first_resseq": 1,
+        "id": "A",
+        "last_resseq": 12,
+        "n_residues": 12,
+        "sequence": "MKVLAEITDFSR"
+      },
+      {
+        "first_resseq": 101,
+        "id": "B",
+        "last_resseq": 112,
+        "n_residues": 12,
+        "sequence": "MKVLAEITDFSR"
+      }
+    ],
+    "created_at": "2026-01-01T00:00:00Z",
+    "format": "pdb",
+    "has_pae": false,
+    "id": "st_fixture03",
+    "label": "Fixture complex (synthetic, two chains)",
+    "n_residues": 24,
+    "origin_id": "imported-fixture-complex:fixture-complex.pdb",
+    "provenance": {
+      "experiment_id": "imported-fixture-complex",
+      "notes": "Registered automatically from the experiment bundle that lists it as an output. Source 'experimental' is as the bundle declared it; it was not inferred from the file.",
+      "retrieved_at": "2026-01-01T00:00:00Z",
+      "source": "experiment:imported-fixture-complex",
+      "url": null
+    },
+    "sha256": "f55dc52db291805b5d76b85d1ccfd717da22cf901551d58d2c4bea439acf9de1",
+    "source": "experimental"
+  },
+  {
+    "chains": [
+      {
+        "first_resseq": 1,
+        "id": "A",
+        "last_resseq": 12,
+        "n_residues": 12,
+        "sequence": "MKVLAEITDFSR"
+      }
+    ],
+    "created_at": "2026-01-01T00:00:00Z",
+    "format": "pdb",
+    "has_pae": true,
+    "id": "st_fixture04",
+    "label": "Fixture model (synthetic, with PAE)",
+    "n_residues": 12,
+    "origin_id": "imported-fixture-predicted:fixture-predicted.pdb",
+    "provenance": {
+      "experiment_id": "imported-fixture-predicted",
+      "notes": "Registered automatically from the experiment bundle that lists it as an output. Source 'predicted' is as the bundle declared it; it was not inferred from the file.",
+      "retrieved_at": "2026-01-01T00:00:00Z",
+      "source": "experiment:imported-fixture-predicted",
+      "url": null
+    },
+    "sha256": "5289bd1ccd2ed08fa439740588accd83eb2d32862bc0b6a9cb45e71a4b6eeb5b",
+    "source": "predicted"
+  }
+]

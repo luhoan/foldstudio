@@ -1,0 +1,3 @@
+{
+  "detail": "plddt_unavailable: structure source is 'experimental'. pLDDT is only read from structures declared as 'predicted' (B-factors of experimental or unlabelled files are a different quantity)."
+}

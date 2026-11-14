@@ -1,0 +1,52 @@
+{
+  "chain": "A",
+  "end": 12,
+  "explanations": [
+    {
+      "refs": [
+        {
+          "name": "source",
+          "unit": null,
+          "value": "uploaded"
+        },
+        {
+          "name": "n_residues",
+          "unit": null,
+          "value": 12
+        },
+        {
+          "name": "chain",
+          "unit": null,
+          "value": "A"
+        },
+        {
+          "name": "start",
+          "unit": null,
+          "value": 1
+        },
+        {
+          "name": "end",
+          "unit": null,
+          "value": 12
+        }
+      ],
+      "rule_id": "no_confidence",
+      "text": "Residues 1-12 of chain A (12 residues) come from a file that was not declared to be a predicted model. Its B-factor column is therefore not read as pLDDT, and no model-confidence scores are reported for it. A designed backbone, for example, carries no confidence values of its own. Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation."
+    }
+  ],
+  "limitations": [
+    "Model confidence is not evidence of folding, binding, affinity, efficacy, safety, or experimental validation."
+  ],
+  "n_residues": 12,
+  "numbers_used": {
+    "chain": "A",
+    "end": 12,
+    "n_residues": 12,
+    "source": "uploaded",
+    "start": 1
+  },
+  "source": "uploaded",
+  "start": 1,
+  "structure_id": "st_fixture01",
+  "summary": "Residues 1-12 of chain A (12 residues) come from a file that was not declared to be a predicted model. Its B-factor column is therefore not read as pLDDT, and no model-confidence scores are reported for it. A designed backbone, for example, carries no confidence values of its own."
+}
