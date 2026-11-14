@@ -287,6 +287,20 @@ check "every stage after the first chains on a bare job id" \
       "$(printf '%s\n' "${sb_out}" | grep -c '(after 2746971)$')" "3"
 rm -rf "${SBDIR}"
 
+# ------------------------------------------------------- 7d. status finds the live run
+# `status` with no run id used to mint a fresh UTC timestamp, so running it
+# seconds after `submit` reported on a directory that never existed and said
+# "nothing has started" about a run that was queued and fine.
+STDIR="$(mktemp -d)"
+mkdir -p "${STDIR}/runs/20261113T090000Z" "${STDIR}/runs/20261114T104316Z"
+st_out="$(FS_HOME_BASE="${STDIR}" bash "${REPO}/hpc/run_pipeline.sh" status 2>&1 || true)"
+check "status with no arg reports the newest existing run" \
+      "$(printf '%s\n' "${st_out}" | sed -n 's/^run_id *//p' | head -1)" "20261114T104316Z"
+st_out="$(FS_HOME_BASE="${STDIR}" bash "${REPO}/hpc/run_pipeline.sh" status 20261113T090000Z 2>&1 || true)"
+check "an explicit run id still wins" \
+      "$(printf '%s\n' "${st_out}" | sed -n 's/^run_id *//p' | head -1)" "20261113T090000Z"
+rm -rf "${STDIR}"
+
 # ------------------------------------------------------- 8. torn ledger line survives
 printf '{"event":"stage_start","stage":"tr' >>"$LEDGER"
 printf '\n' >>"$LEDGER"

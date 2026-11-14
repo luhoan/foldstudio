@@ -235,6 +235,14 @@ PY
   echo "      so preemption shows up as extra attempts in the ledger, not lost work."
 }
 
+# fs_latest_run_id -- newest run directory under ${FS_RUNS_DIR}, or empty.
+# Run ids are UTC timestamps, so lexical order is chronological order.
+fs_latest_run_id() {
+  [ -d "${FS_RUNS_DIR}" ] || return 0
+  find "${FS_RUNS_DIR}" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null \
+    | sort | tail -1
+}
+
 do_status() {
   echo "run_id   ${FS_RUN_ID}"
   echo "work dir ${FS_WORK}"
@@ -322,7 +330,19 @@ shift || true
 case "${subcmd}" in
   submit)  do_submit ;;
   status)
-    [ -n "${1:-}" ] && fs_set_run_id "$1"
+    # With no run id, report on the newest run rather than minting a fresh
+    # timestamp -- that used to make `status` straight after `submit` look at a
+    # directory a few seconds newer than the run and announce "nothing started".
+    if [ -n "${1:-}" ]; then
+      fs_set_run_id "$1"
+    else
+      latest="$(fs_latest_run_id)"
+      if [ -n "${latest}" ]; then
+        fs_set_run_id "${latest}"
+      else
+        echo "(no runs found under ${FS_RUNS_DIR})"
+      fi
+    fi
     do_status ;;
   resume)
     [ -n "${1:-}" ] || fs_die "resume needs a run id: bash hpc/run_pipeline.sh resume <RUN_ID>"
