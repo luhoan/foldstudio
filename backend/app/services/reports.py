@@ -50,6 +50,45 @@ def _j(v):
     return json.dumps(v, sort_keys=True, ensure_ascii=False)
 
 
+def _unavailable(e) -> list[tuple[str, str]]:
+    """(metric, reason) pairs a bundle declared it could NOT measure.
+
+    A report that lists only what was measured reads as if nothing was missing,
+    so these are printed next to the metrics rather than left out.
+    """
+    block = e.get("metrics_unavailable")
+    if not isinstance(block, dict):
+        return []
+    return [(str(k), str(v)) for k, v in block.items()]
+
+
+def _definition(e, key) -> str:
+    defs = e.get("metric_definitions")
+    text = defs.get(key) if isinstance(defs, dict) else None
+    return str(text) if isinstance(text, str) and text else ""
+
+
+def _workflow(e) -> list[dict]:
+    """Per-stage rows of a pipeline bundle, when it has them."""
+    block = e.get("workflow")
+    if not isinstance(block, list):
+        return []
+    rows = []
+    for item in block:
+        if not isinstance(item, dict) or not item.get("stage"):
+            continue
+        wall = item.get("wall_seconds")
+        rows.append({
+            "stage": str(item["stage"]),
+            "status": str(item.get("status_label") or item.get("status") or "not recorded"),
+            "wall": f"{wall:g} s" if isinstance(wall, (int, float)) and not isinstance(wall, bool) else "not recorded",
+            "outputs": str(item.get("outputs")) if item.get("outputs") is not None else "not recorded",
+            "preemptions": str(item.get("preemptions") or 0),
+            "detail": str(item.get("error") or item.get("note") or ""),
+        })
+    return rows
+
+
 def _md(s):
     return str(s).replace("|", "\\|").replace("\n", " ")
 
@@ -78,7 +117,24 @@ def _markdown(exps, cmp_, structs, generated):
         if not e["inputs"]:
             L.append("- none recorded")
         L += ["", "### Outputs", ""] + ([f"- {_j(o)}" for o in e["outputs"]] or ["- none recorded"])
-        L += ["", "### Metrics", ""] + ([f"- {k}: {_j(v)}" for k, v in e["metrics"].items()] or ["- none recorded"]) + [""]
+        L += ["", "### Metrics", ""]
+        for k, v in e["metrics"].items():
+            d = _definition(e, k)
+            L.append(f"- {k}: {_j(v)}" + (f" ({d})" if d else ""))
+        if not e["metrics"]:
+            L.append("- none recorded")
+        missing = _unavailable(e)
+        if missing:
+            L += ["", "### Metrics not measured", "",
+                  "The run recorded that it could not measure these, and why. They are not zero; they are absent.", ""]
+            L += [f"- {k}: {reason}" for k, reason in missing]
+        stages = _workflow(e)
+        if stages:
+            L += ["", "### Pipeline stages", "",
+                  "| Stage | Status | Wall time | Outputs | Preemptions | Error / note |", "|---|---|---|---|---|---|"]
+            L += [f"| {_md(r['stage'])} | {_md(r['status'])} | {_md(r['wall'])} | {_md(r['outputs'])} | "
+                  f"{_md(r['preemptions'])} | {_md(r['detail'])} |" for r in stages]
+        L.append("")
     if cmp_:
         L += ["## Comparison", "", "| Field | " + " | ".join(_md(i) for i in cmp_["ids"]) + " | Differs |", "|---|" + "---|" * (len(cmp_["ids"]) + 1)]
         for grp, title in (("fields", ""), ("settings", "settings."), ("metrics", "metrics.")):
@@ -131,8 +187,24 @@ def _html(exps, cmp_, structs, generated):
             "<h3>Outputs</h3>",
             li([_j(o) for o in e["outputs"]] or ["none recorded"]),
             "<h3>Metrics</h3>",
-            li([f"{k}: {_j(v)}" for k, v in e["metrics"].items()] or ["none recorded"]),
+            li([f"{k}: {_j(v)}" + (f" ({_definition(e, k)})" if _definition(e, k) else "")
+                for k, v in e["metrics"].items()] or ["none recorded"]),
         ]
+        missing = _unavailable(e)
+        if missing:
+            parts += [
+                "<h3>Metrics not measured</h3>",
+                "<p>The run recorded that it could not measure these, and why. They are not zero; they are absent.</p>",
+                li([f"{k}: {reason}" for k, reason in missing]),
+            ]
+        stages = _workflow(e)
+        if stages:
+            parts.append("<h3>Pipeline stages</h3><table><tr><th>Stage</th><th>Status</th><th>Wall time</th>"
+                         "<th>Outputs</th><th>Preemptions</th><th>Error / note</th></tr>")
+            for r in stages:
+                parts.append("<tr>" + "".join(f"<td>{e_(r[k])}</td>" for k in
+                                              ("stage", "status", "wall", "outputs", "preemptions", "detail")) + "</tr>")
+            parts.append("</table>")
     if cmp_:
         parts.append("<h2>Comparison</h2><table><tr><th>Field</th>" + "".join(f"<th>{e_(i)}</th>" for i in cmp_["ids"]) + "<th>Differs</th></tr>")
         for grp, title in (("fields", ""), ("settings", "settings."), ("metrics", "metrics.")):

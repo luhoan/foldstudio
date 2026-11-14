@@ -188,3 +188,78 @@ def test_register_local_file(client):
     r = client.post("/api/structures/register", json={"path": "demo.pdb", "label": "x", "source": "uploaded", "pae_path": "../foldstudio.db"})
     assert r.status_code == 400 and "invalid_path" in r.json()["detail"]
     assert client.post("/api/structures/register", json={"path": "missing.pdb", "label": "x", "source": "uploaded"}).status_code == 404
+
+
+# ---- reports: what a pipeline bundle carries beyond the core fields
+
+def _pipeline_experiment(**over):
+    body = {
+        "id": "hpc_run", "kind": "executed", "status": "partial", "model_name": "RFdiffusion + ProteinMPNN + ESMFold",
+        "outputs": ["structures/design_0.pdb"], "error": "predict stage died",
+        "metrics": {"n_backbones": 1, "mpnn_best_score": 0.8221},
+        "metric_definitions": {"mpnn_best_score": "Lowest ProteinMPNN score= value; lower is better."},
+        "metrics_unavailable": {"self_consistency_ca_rmsd_best": "the prediction stage produced no output"},
+        "workflow": [
+            {"stage": "Backbone generation", "status": "executed", "status_label": "executed",
+             "wall_seconds": 70.381, "outputs": 1, "preemptions": 0, "error": None, "note": None},
+            {"stage": "Structure prediction", "status": "failed", "status_label": "failed",
+             "wall_seconds": None, "outputs": 0, "preemptions": 2, "error": "CUDA out of memory", "note": None},
+        ],
+        "provenance": {"source": "FoldStudio HPC pipeline"},
+    }
+    body.update(over)
+    return body
+
+
+def test_report_lists_metrics_that_were_not_measured(client):
+    client.post("/api/experiments", json=_pipeline_experiment())
+    md = client.get("/api/reports?ids=hpc_run&format=markdown").text
+    assert "### Metrics not measured" in md
+    assert "self_consistency_ca_rmsd_best: the prediction stage produced no output" in md
+    assert "They are not zero; they are absent." in md
+    html_ = client.get("/api/reports?ids=hpc_run&format=html").text
+    assert "Metrics not measured" in html_ and "the prediction stage produced no output" in html_
+
+
+def test_report_shows_each_pipeline_stage_with_its_real_outcome(client):
+    client.post("/api/experiments", json=_pipeline_experiment())
+    md = client.get("/api/reports?ids=hpc_run&format=markdown").text
+    assert "| Backbone generation | executed | 70.381 s | 1 | 0 |  |" in md
+    assert "| Structure prediction | failed | not recorded | 0 | 2 | CUDA out of memory |" in md
+    html_ = client.get("/api/reports?ids=hpc_run&format=html").text
+    assert "<td>Structure prediction</td><td>failed</td>" in html_
+    assert "CUDA out of memory" in html_
+
+
+def test_report_puts_the_definition_next_to_the_metric(client):
+    client.post("/api/experiments", json=_pipeline_experiment())
+    md = client.get("/api/reports?ids=hpc_run&format=markdown").text
+    assert "- mpnn_best_score: 0.8221 (Lowest ProteinMPNN score= value; lower is better.)" in md
+    assert "- n_backbones: 1\n" in md, "a metric without a definition is printed bare"
+
+
+def test_report_without_the_optional_blocks_is_unchanged(client):
+    client.post("/api/experiments", json={"id": "plain", "kind": "demo", "status": "ok", "model_name": "m",
+                                          "provenance": {"source": "s"}})
+    md = client.get("/api/reports?ids=plain&format=markdown").text
+    assert "Metrics not measured" not in md and "Pipeline stages" not in md
+
+
+def test_report_escapes_pipeline_text_in_html(client):
+    evil = "<script>alert(1)</script>"
+    client.post("/api/experiments", json=_pipeline_experiment(
+        metrics_unavailable={"x": evil},
+        workflow=[{"stage": evil, "status_label": evil, "error": evil}],
+        metric_definitions={"n_backbones": evil}))
+    html_ = client.get("/api/reports?ids=hpc_run&format=html").text
+    assert "<script>" not in html_
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html_
+
+
+def test_report_tolerates_malformed_optional_blocks(client):
+    """extra='allow' means anything can arrive in these fields; a report must still render."""
+    client.post("/api/experiments", json=_pipeline_experiment(
+        metrics_unavailable=["not", "a", "dict"], workflow="nope", metric_definitions=7))
+    r = client.get("/api/reports?ids=hpc_run&format=json")
+    assert r.status_code == 200
+    assert "Metrics not measured" not in r.json()["markdown"]
