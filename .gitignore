@@ -1,0 +1,20 @@
+# Byproducts, wherever they turn up
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+node_modules/
+.DS_Store
+*.swp
+
+# The backend's own state. Rebuilt from data/experiments/ on every start, so it
+# is never the copy to keep.
+data/foldstudio.db
+data/foldstudio.db-*
+data/pae/
+data/.replaced_experiments/
+
+# data/structures/ and data/experiments/ are deliberately NOT ignored: a bundle
+# exported from a real run is something a team may well want to commit. They
+# show up as untracked until someone decides.
