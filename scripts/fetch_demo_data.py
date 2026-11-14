@@ -296,7 +296,11 @@ def write_experiment(info: dict, extra: dict, data_dir: Path) -> Path:
         metrics["mean_plddt_ca"] = extra["mean_plddt_ca"]
     if extra.get("interfaces"):
         metrics["interfaces"] = extra["interfaces"]
-    outputs = [{"type": "structure", "path": info["file"], "sha256": info["sha256"]}]
+    # "source" is read by the backend when it auto-registers this structure:
+    # GET /structures/{id}/plddt reads B-factors as pLDDT for "predicted" only,
+    # and a deposited entry's B-factors are a different quantity entirely.
+    outputs = [{"type": "structure", "path": info["file"], "sha256": info["sha256"],
+                "source": "predicted" if predicted else "experimental"}]
     if info.get("pae"):
         outputs.append({"type": "pae", "path": info["pae"]["file"], "sha256": info["pae"]["sha256"]})
     exp = {

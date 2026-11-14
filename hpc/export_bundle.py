@@ -724,6 +724,13 @@ def build(args) -> tuple[Bundle, dict, dict]:
         "settings": settings,
         "inputs": [],
         "outputs": list(b.outputs),
+        # outputs stays a list of strings, which is what the frontend's
+        # Experiment type declares. The per-file source the backend needs in
+        # order to auto-register these structures goes here instead, taken from
+        # the same register bodies that drive import_plan.json -- so a backbone
+        # is "uploaded" and only a real prediction is "predicted".
+        "structure_sources": {os.path.basename(r["body"]["path"]): r["body"]["source"]
+                              for r in b.register if "source" in r.get("body", {})},
         "metrics": dict(b.metrics),
         "error": error_text,
         "provenance": {

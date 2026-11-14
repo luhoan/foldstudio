@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from app.db import db
 from app.errors import AppError
 from app.services.structure_io import now_iso
+from app.services import structure_store
 
 ID_RE = re.compile(r"^[A-Za-z0-9_.-]{1,80}$")
 
@@ -119,7 +120,7 @@ def compare(ctx, ids: list[str]) -> dict:
 
 def reindex(ctx) -> dict:
     """Load <data>/experiments/<dir>/experiment.json bundles (from the data and HPC streams)."""
-    imported, errors = [], []
+    imported, errors, registered = [], [], []
     for d in sorted(p for p in ctx.experiments_dir.iterdir() if p.is_dir()):
         f = d / "experiment.json"
         if not f.exists():
@@ -131,8 +132,16 @@ def reindex(ctx) -> dict:
             payload.setdefault("id", d.name)
             saved = save(ctx, payload, overwrite=True)
             imported.append(saved["id"])
+            # Register the structures this bundle lists, so the API-driven
+            # panels have something to show. Idempotent, and never fatal: a bad
+            # output must not stop the experiment itself from being indexed.
+            reg = structure_store.register_experiment_outputs(ctx, saved)
+            registered.extend(reg["registered"])
+            for err in reg["errors"]:
+                errors.append({"path": f"{d.name}/{err['path']}", "error": err["error"]})
         except AppError as e:
             errors.append({"path": str(f.relative_to(ctx.data_dir)), "error": e.detail})
         except Exception as e:
             errors.append({"path": str(f.relative_to(ctx.data_dir)), "error": f"{type(e).__name__}: {e}"})
-    return {"imported": imported, "errors": errors}
+    return {"imported": imported, "errors": errors,
+            "structures_registered": registered}

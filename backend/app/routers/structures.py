@@ -11,6 +11,7 @@ from app.db import db, structure_row_to_dict
 from app.deps import get_ctx
 from app.errors import AppError
 from app.services import confidence, structure_io as sio
+from app.services.structure_store import store as _store_impl
 
 router = APIRouter(prefix="/structures", tags=["structures"])
 
@@ -22,39 +23,14 @@ def _new_id() -> str:
 
 
 def _store(ctx, *, data: bytes, fmt: str, label: str, source: str, origin_id, provenance: dict, pae: Optional[bytes] = None, fixed_path: Optional[Path] = None) -> dict:
-    """Validate, persist file (+PAE) and DB row; returns the public structure dict."""
-    text = sio.decode(data)
-    if fmt == "fasta":
-        records = sio.parse_fasta(text)
-        chains = [{"id": r["id"], "n_residues": r["n_residues"], "sequence": r["sequence"]} for r in records]
-        n_res = sum(c["n_residues"] for c in chains)
-    else:
-        model = sio.parse_structure(text, fmt)
-        info = sio.summarize(model)
-        chains, n_res = info["chains"], info["n_residues"]
-    pae_info = None
-    if pae is not None:
-        pae_info = confidence.parse_pae(pae)  # validates JSON shape
-    sid = _new_id()
-    ext = {"pdb": "pdb", "mmcif": "cif", "fasta": "fasta"}[fmt]
-    if fixed_path is None:
-        path = ctx.structures_dir / f"{sid}.{ext}"
-        path.write_bytes(data)
-    else:
-        path = fixed_path
-    pae_rel = None
-    if pae_info is not None:
-        pae_path = ctx.pae_dir / f"{sid}.json"
-        pae_path.write_bytes(pae)
-        pae_rel = ctx.rel(pae_path)
-    prov = dict(provenance)
-    with db(ctx) as c:
-        c.execute(
-            "INSERT INTO structures (id,label,source,origin_id,format,sha256,chains,n_residues,file_path,pae_path,provenance,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-            (sid, label, source, origin_id, fmt, sio.sha256(data), json.dumps(chains), n_res, ctx.rel(path), pae_rel, json.dumps(prov), sio.now_iso()),
-        )
-        row = c.execute("SELECT * FROM structures WHERE id=?", (sid,)).fetchone()
-    return structure_row_to_dict(row)
+    """Validate, persist file (+PAE) and DB row; returns the public structure dict.
+
+    The implementation lives in services/structure_store so that the experiment
+    reindex can register a bundle's structures through exactly this path.
+    """
+    return _store_impl(ctx, data=data, fmt=fmt, label=label, source=source,
+                       origin_id=origin_id, provenance=provenance, pae=pae,
+                       fixed_path=fixed_path)
 
 
 def _inside(base: Path, rel: str, label: str) -> Path:
