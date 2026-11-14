@@ -1,0 +1,15 @@
+{
+  "experiments": [
+    {
+      "experiment_id": "demo-experiment-001",
+      "model_name": "Illustrative model",
+      "kind": "demo",
+      "status": "partial",
+      "metrics": {
+        "illustrative_metric": 0.72
+      }
+    }
+  ],
+  "_fixture_kind": "demo",
+  "_notice": "Synthetic comparison fixture; not a real run or scientific result."
+}
