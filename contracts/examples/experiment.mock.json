@@ -1,0 +1,27 @@
+{
+  "id": "demo-experiment-001",
+  "created_at": "2026-01-01T12:00:00Z",
+  "kind": "demo",
+  "status": "partial",
+  "model_name": "Illustrative model",
+  "model_version": "demo-only",
+  "settings": {
+    "workflow_stage": "structure_prediction"
+  },
+  "inputs": [
+    "demo-structure-001"
+  ],
+  "outputs": [
+    "demo-structure-001"
+  ],
+  "metrics": {
+    "illustrative_metric": 0.72
+  },
+  "error": null,
+  "provenance": {
+    "source": "Synthetic UI fixture",
+    "retrieved_at": "2026-01-01T12:00:00Z",
+    "url": null,
+    "notes": "Synthetic demo fixture; not a real run or scientific result."
+  }
+}

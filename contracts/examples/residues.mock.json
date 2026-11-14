@@ -1,0 +1,90 @@
+{
+  "structure_id": "demo-structure-001",
+  "residues": [
+    {
+      "structure_id": "demo-structure-001",
+      "chain": "A",
+      "seq_id": 1,
+      "comp_id": "MET",
+      "plddt": 50
+    },
+    {
+      "structure_id": "demo-structure-001",
+      "chain": "A",
+      "seq_id": 2,
+      "comp_id": "GLY",
+      "plddt": 53
+    },
+    {
+      "structure_id": "demo-structure-001",
+      "chain": "A",
+      "seq_id": 3,
+      "comp_id": "SER",
+      "plddt": 56
+    },
+    {
+      "structure_id": "demo-structure-001",
+      "chain": "A",
+      "seq_id": 4,
+      "comp_id": "ALA",
+      "plddt": 59
+    },
+    {
+      "structure_id": "demo-structure-001",
+      "chain": "A",
+      "seq_id": 5,
+      "comp_id": "MET",
+      "plddt": 62
+    },
+    {
+      "structure_id": "demo-structure-001",
+      "chain": "A",
+      "seq_id": 6,
+      "comp_id": "GLY",
+      "plddt": 65
+    },
+    {
+      "structure_id": "demo-structure-001",
+      "chain": "A",
+      "seq_id": 7,
+      "comp_id": "SER",
+      "plddt": 68
+    },
+    {
+      "structure_id": "demo-structure-001",
+      "chain": "A",
+      "seq_id": 8,
+      "comp_id": "ALA",
+      "plddt": 71
+    },
+    {
+      "structure_id": "demo-structure-001",
+      "chain": "A",
+      "seq_id": 9,
+      "comp_id": "MET",
+      "plddt": 74
+    },
+    {
+      "structure_id": "demo-structure-001",
+      "chain": "A",
+      "seq_id": 10,
+      "comp_id": "GLY",
+      "plddt": 77
+    },
+    {
+      "structure_id": "demo-structure-001",
+      "chain": "A",
+      "seq_id": 11,
+      "comp_id": "SER",
+      "plddt": 80
+    },
+    {
+      "structure_id": "demo-structure-001",
+      "chain": "A",
+      "seq_id": 12,
+      "comp_id": "ALA",
+      "plddt": 83
+    }
+  ],
+  "_fixture_kind": "demo"
+}

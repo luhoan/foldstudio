@@ -1,0 +1,15 @@
+{
+  "structure_id": "demo-structure-001",
+  "chain": "A",
+  "start": 1,
+  "end": 12,
+  "summary": "Illustrative explanation for the demo fixture. It is not a scientific interpretation.",
+  "numbers_used": {
+    "mean_plddt": 66.5,
+    "residue_count": 12
+  },
+  "limitations": [
+    "Synthetic demo values; not experimental validation."
+  ],
+  "_fixture_kind": "demo"
+}

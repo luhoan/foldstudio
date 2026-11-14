@@ -1,0 +1,15 @@
+{
+  "id": "demo-structure-001",
+  "label": "Illustrative demo structure",
+  "source": "predicted",
+  "origin_id": "DEMO-UNIPROT-0001",
+  "format": "pdb",
+  "sha256": "demo-sha256-not-a-real-file",
+  "chains": [
+    "A",
+    "B"
+  ],
+  "n_residues": 12,
+  "_fixture_kind": "demo",
+  "_notice": "Synthetic UI fixture; not a real structure or scientific result."
+}

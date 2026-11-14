@@ -1,0 +1,66 @@
+{
+  "structure_id": "demo-structure-001",
+  "residues": [
+    {
+      "chain": "A",
+      "seq_id": 1,
+      "plddt": 50
+    },
+    {
+      "chain": "A",
+      "seq_id": 2,
+      "plddt": 53
+    },
+    {
+      "chain": "A",
+      "seq_id": 3,
+      "plddt": 56
+    },
+    {
+      "chain": "A",
+      "seq_id": 4,
+      "plddt": 59
+    },
+    {
+      "chain": "A",
+      "seq_id": 5,
+      "plddt": 62
+    },
+    {
+      "chain": "A",
+      "seq_id": 6,
+      "plddt": 65
+    },
+    {
+      "chain": "A",
+      "seq_id": 7,
+      "plddt": 68
+    },
+    {
+      "chain": "A",
+      "seq_id": 8,
+      "plddt": 71
+    },
+    {
+      "chain": "A",
+      "seq_id": 9,
+      "plddt": 74
+    },
+    {
+      "chain": "A",
+      "seq_id": 10,
+      "plddt": 77
+    },
+    {
+      "chain": "A",
+      "seq_id": 11,
+      "plddt": 80
+    },
+    {
+      "chain": "A",
+      "seq_id": 12,
+      "plddt": 83
+    }
+  ],
+  "_fixture_kind": "demo"
+}
