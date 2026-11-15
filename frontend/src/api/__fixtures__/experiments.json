@@ -10,7 +10,7 @@
     "inputs": [],
     "kind": "executed",
     "metric_definitions": {
-      "mpnn_best_score": "Lowest ProteinMPNN score= value among designed sequences; lower is better.",
+      "mpnn_best_score": "Lowest of the `score=` values ProteinMPNN wrote in its FASTA headers, among the designed sequences; lower is better.",
       "predicted_best_mean_plddt": "Highest mean pLDDT among the predicted structures of designed sequences.",
       "self_consistency_ca_rmsd_best": "Lowest CA RMSD between a predicted structure and the backbone it was designed for, after optimal superposition."
     },
@@ -21,7 +21,7 @@
       "n_predicted_structures": 1,
       "n_sequences_designed": 1,
       "predicted_best_mean_plddt": 64.33,
-      "self_consistency_ca_rmsd_best": 0.0
+      "self_consistency_ca_rmsd_best": 1.42
     },
     "metrics_unavailable": {
       "predicted_mean_ptm": "the predictor did not return a pTM value"

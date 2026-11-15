@@ -57,6 +57,21 @@ def explain_plddt_residue(value: float, chain: str, resnum: int) -> Explanation:
     return _finish("plddt_residue", T_fmt(b["text"], value=value), refs)
 
 
+def residue_range(start: int, end: int) -> str:
+    """Render a residue range so a negative number cannot be read as a dash.
+
+    Residue numbering is the file's own, and PDB files really do carry
+    zero and negative residue numbers (expression tags, cloning artefacts).
+    Formatting those as `{start}-{end}` produces "-1-104", which reads as
+    nonsense. Fall back to the word when either end is not positive.
+    """
+    if start == end:
+        return str(start)
+    if start > 0 and end > 0:
+        return f"{start}-{end}"
+    return f"{start} to {end}"
+
+
 def T_fmt(template: str, **kw) -> str:
     return template.format(**kw)
 
@@ -75,7 +90,7 @@ def explain_plddt_region(values: Sequence[float], chain: str, start: int, end: i
     refs = [_ref("mean_plddt", round(mean, 3)), _ref("n_residues", n),
            _ref("chain", chain), _ref("start", start), _ref("end", end)]
     refs += [_ref(f"fraction_{k}", round(c / n, 4)) for k, c in counts.items()]
-    body = T["plddt_region"].format(start=start, end=end, chain=chain, n=n,
+    body = T["plddt_region"].format(residue_range=residue_range(start, end), chain=chain, n=n,
                                     mean=mean, bin_summary=bin_summary)
     return _finish("plddt_region", body, refs)
 
@@ -92,7 +107,7 @@ def explain_pae_region(pae: Sequence[Sequence[float]], chain: str, start: int, e
     refs = [_ref("mean_pae", round(mean, 3), "A"), _ref("max_pae", mx, "A"),
             _ref("n_pairs", len(vals)), _ref("chain", chain),
             _ref("start", start), _ref("end", end)]
-    body = T["pae_region"].format(start=start, end=end, chain=chain,
+    body = T["pae_region"].format(residue_range=residue_range(start, end), chain=chain,
                                   mean=mean, max=mx, n_pairs=len(vals))
     return _finish("pae_region", body, refs)
 
@@ -170,7 +185,9 @@ def explain_no_confidence(source: str, chain: str, start: int, end: int, n: int)
     key = "no_confidence_experimental" if source == "experimental" else "no_confidence_unlabelled"
     refs = [_ref("source", source), _ref("n_residues", n), _ref("chain", chain),
             _ref("start", start), _ref("end", end)]
-    return _finish("no_confidence", T[key].format(start=start, end=end, chain=chain, n=n), refs)
+    return _finish("no_confidence",
+                   T[key].format(residue_range=residue_range(start, end), chain=chain, n=n),
+                   refs)
 
 
 def explain_low_identity_matching(sequence_identity: float, example_resnum: int) -> Explanation:

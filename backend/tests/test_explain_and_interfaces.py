@@ -223,3 +223,30 @@ def test_interchain_pae_is_the_mean_of_the_off_diagonal_blocks(client):
     assert client.post(f"/api/structures/{sid}/pae", files={"file": ("p.json", raw, "application/json")}).status_code == 201
     iface = client.get(f"/api/structures/{sid}/interfaces").json()["interfaces"][0]
     assert iface["mean_interchain_pae"] == 7.0
+
+
+def test_a_negative_residue_number_does_not_render_as_a_run_of_dashes():
+    """PDB files really do number residues from zero or below -- expression
+    tags and cloning artefacts keep their own numbering. Formatting such a
+    range as `{start}-{end}` produced "Residues -1-104", which reads as
+    nonsense rather than as a range. Nothing about the data changed here;
+    only how it is said."""
+    assert rules.residue_range(1, 104) == "1-104"
+    assert rules.residue_range(-1, 104) == "-1 to 104"
+    assert rules.residue_range(0, 12) == "0 to 12"
+    assert rules.residue_range(-20, -3) == "-20 to -3"
+    # a single residue is a point, not a range
+    assert rules.residue_range(7, 7) == "7"
+    assert rules.residue_range(-5, -5) == "-5"
+
+
+def test_the_no_confidence_sentence_uses_that_range(client):
+    text = "\n".join(
+        f"ATOM  {i + 1:5d}  CA  ALA A{n:4d}    "
+        f"{i * 3.8:8.3f}{0.0:8.3f}{0.0:8.3f}  1.00 50.00           C"
+        for i, n in enumerate(range(-1, 5))
+    ) + "\nEND\n"
+    sid = upload(client, text, "tagged.pdb", source="experimental").json()["id"]
+    body = client.get(f"/api/explain", params={"structure": sid}).json()
+    assert "Residues -1 to 4 of chain A" in json.dumps(body)
+    assert "-1-4" not in json.dumps(body)

@@ -197,7 +197,7 @@ def _pipeline_experiment(**over):
         "id": "hpc_run", "kind": "executed", "status": "partial", "model_name": "RFdiffusion + ProteinMPNN + ESMFold",
         "outputs": ["structures/design_0.pdb"], "error": "predict stage died",
         "metrics": {"n_backbones": 1, "mpnn_best_score": 0.8221},
-        "metric_definitions": {"mpnn_best_score": "Lowest ProteinMPNN score= value; lower is better."},
+        "metric_definitions": {"mpnn_best_score": "Lowest of the `score=` values ProteinMPNN wrote; lower is better."},
         "metrics_unavailable": {"self_consistency_ca_rmsd_best": "the prediction stage produced no output"},
         "workflow": [
             {"stage": "Backbone generation", "status": "executed", "status_label": "executed",
@@ -234,7 +234,7 @@ def test_report_shows_each_pipeline_stage_with_its_real_outcome(client):
 def test_report_puts_the_definition_next_to_the_metric(client):
     client.post("/api/experiments", json=_pipeline_experiment())
     md = client.get("/api/reports?ids=hpc_run&format=markdown").text
-    assert "- mpnn_best_score: 0.8221 (Lowest ProteinMPNN score= value; lower is better.)" in md
+    assert "- mpnn_best_score: 0.8221 (Lowest of the `score=` values ProteinMPNN wrote; lower is better.)" in md
     assert "- n_backbones: 1\n" in md, "a metric without a definition is printed bare"
 
 
