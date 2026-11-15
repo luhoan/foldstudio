@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "./typography.css";
+/* Interaction polish, kept separate so it can be reverted on its own. */
+@import "./polish.css";
 
 @custom-variant dark (&:is(.dark *));
 

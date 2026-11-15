@@ -1,0 +1,132 @@
+/*
+ * Interaction polish. Additive only: no colour, type scale or spacing token changes,
+ * no component markup. Deleting the @import in theme.css reverts all of it.
+ *
+ * Each rule answers something the app already does but does abruptly, or something
+ * long data tables make awkward. Nothing here is decoration for its own sake.
+ */
+
+@layer base {
+  /*
+   * The app had transitions on the sidebar only, so buttons, inputs and selects
+   * snapped between states while the nav eased. One short curve everywhere makes
+   * the whole surface feel like one piece. 120ms is below the ~150ms where motion
+   * starts being perceived as waiting.
+   */
+  button,
+  select,
+  input,
+  textarea,
+  summary,
+  [role='button'],
+  a {
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      color 120ms ease,
+      opacity 120ms ease;
+  }
+
+  /* Press feedback: the control acknowledges the click before the data arrives. */
+  button:not(:disabled):active,
+  [role='button']:not([aria-disabled='true']):active {
+    transform: translateY(0.5px);
+  }
+
+  /* A disabled control should look unavailable, not merely unresponsive. */
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  textarea:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  /*
+   * Headings wrap at the widest line by default, which strands single words.
+   * `balance` evens the lines; `pretty` keeps orphans out of body copy.
+   */
+  h1,
+  h2,
+  h3,
+  .fs-page-title {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+
+  /*
+   * Figures that update in place (pLDDT, RMSD, TM-score) shift width as digits
+   * change, which reads as flicker. Tables already had this; the Stat blocks and
+   * definition lists that carry the headline numbers did not.
+   */
+  dd,
+  output,
+  .fs-num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Anchoring scroll below a sticky header, for in-page jumps. */
+  html {
+    scroll-padding-top: 1rem;
+  }
+}
+
+@layer components {
+  /*
+   * A header that scrolls away is the main friction in this app: the run has 900
+   * predictions, and by row 40 the columns are unlabelled. Sticking the header
+   * costs nothing and removes the scroll-back-up loop entirely.
+   */
+  .fs-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--card);
+    /* The row border doesn't travel with a sticky element, so it's drawn as a shadow. */
+    box-shadow: inset 0 -1px 0 var(--border);
+  }
+
+  /*
+   * Row hover existed but arrived instantly, which feels twitchy when the pointer
+   * crosses a long list. Easing it in and leaving it slower on the way out makes
+   * the pointer's position legible without drawing attention.
+   */
+  .fs-table tbody tr td {
+    transition: background-color 90ms ease-out;
+  }
+
+  /*
+   * Plates sat flush against the background. A one-pixel top highlight reads as a
+   * lit edge and separates stacked cards without adding a heavier border or the
+   * uniform drop shadow every generated dashboard uses.
+   */
+  .fs-card {
+    box-shadow: inset 0 1px 0 color-mix(in oklab, #ffffff 4%, transparent);
+  }
+
+  /*
+   * Loading text is a static line, so a slow run looks identical to a hung one.
+   * A quiet pulse says the app is still working. Reduced-motion users get the
+   * static text, which is already handled globally in theme.css.
+   */
+  [role='status'] {
+    animation: fs-breathe 1.8s ease-in-out infinite;
+  }
+
+  @keyframes fs-breathe {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+
+  /* Links in prose should underline on hover without shifting the baseline. */
+  .fs-link {
+    transition: text-decoration-color 120ms ease;
+  }
+}
