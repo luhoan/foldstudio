@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -9,6 +10,7 @@ from app.db import db, structure_row_to_dict
 from app.deps import get_ctx
 from app.errors import AppError
 from app.services import confidence, structure_io as sio
+from app.services import structure_store
 from app.services.structure_store import store as _store_impl
 
 router = APIRouter(prefix="/structures", tags=["structures"])
@@ -179,6 +181,18 @@ async def attach_pae(sid: str, file: UploadFile = File(...), ctx=Depends(get_ctx
         raise AppError(409, f"pae_mismatch: PAE matrix is {info['size']}x{info['size']} but the structure has {row['n_residues']} residues")
     path = ctx.pae_dir / f"{sid}.json"
     path.write_bytes(raw)
+    # Record that a person put this here. A structure registered from an
+    # experiment bundle gets reconciled against that bundle on every rescan,
+    # and without this mark the reconciliation would delete a PAE the bundle
+    # never knew about. See structure_store.pae_was_attached_by_a_person.
+    try:
+        prov = json.loads(row["provenance"] or "{}")
+    except (ValueError, TypeError):
+        prov = {}
+    if not isinstance(prov, dict):
+        prov = {}
+    prov[structure_store.PAE_ATTACHED_KEY] = True
     with db(ctx) as c:
-        c.execute("UPDATE structures SET pae_path=? WHERE id=?", (ctx.rel(path), sid))
+        c.execute("UPDATE structures SET pae_path=?, provenance=? WHERE id=?",
+                  (ctx.rel(path), json.dumps(prov), sid))
     return {"structure_id": sid, "size": info["size"], "max_pae": info["max_pae"]}

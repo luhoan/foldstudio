@@ -162,7 +162,26 @@ def _str_map(value: Any) -> dict[str, str]:
     return {str(k): str(v) for k, v in value.items()} if isinstance(value, dict) else {}
 
 
-def _provenance(exp_id: str, source: str, refreshed: bool) -> dict:
+PAE_ATTACHED_KEY = "pae_attached_by_user"
+
+
+def pae_was_attached_by_a_person(row) -> bool:
+    """Did someone upload this PAE, rather than it arriving in the bundle?
+
+    A bundle is the source of truth for the files it exported, so a refresh
+    normally makes the row match the bundle exactly. A PAE that a person
+    attached by hand did not come from the bundle, and deleting it because the
+    bundle never mentioned it is data loss, not reconciliation.
+    """
+    try:
+        prov = json.loads(row["provenance"] or "{}")
+    except (ValueError, TypeError):
+        return False
+    return bool(isinstance(prov, dict) and prov.get(PAE_ATTACHED_KEY))
+
+
+def _provenance(exp_id: str, source: str, refreshed: bool,
+                pae_attached: bool = False) -> dict:
     return {
         "source": f"experiment:{exp_id}",
         "experiment_id": exp_id,
@@ -172,7 +191,10 @@ def _provenance(exp_id: str, source: str, refreshed: bool) -> dict:
                   f"output. Source '{source}' is as the bundle declared it; it was not inferred "
                   "from the file."
                   + (" Refreshed because the bundle changed since it was first registered."
-                     if refreshed else "")),
+                     if refreshed else "")
+                  + (" Its PAE matrix was attached here by a person and is kept across "
+                     "refreshes; the bundle did not supply one." if pae_attached else "")),
+        **({PAE_ATTACHED_KEY: True} if pae_attached else {}),
     }
 
 
@@ -188,8 +210,13 @@ def _refresh(ctx, row, *, data: bytes, fmt: str, label: str, source: str, path: 
     chains, n_res = describe(data, fmt)
     pae_rel = None
     pae_file = ctx.pae_dir / f"{row['id']}.json"
+    keep_attached = pae is None and pae_was_attached_by_a_person(row) and pae_file.exists()
     if pae is not None:
+        # The bundle now ships a PAE. It wins, and the row stops being marked
+        # as carrying a hand-attached one.
         pae_file.write_bytes(pae)
+        pae_rel = ctx.rel(pae_file)
+    elif keep_attached:
         pae_rel = ctx.rel(pae_file)
     elif pae_file.exists():
         pae_file.unlink()
@@ -198,7 +225,9 @@ def _refresh(ctx, row, *, data: bytes, fmt: str, label: str, source: str, path: 
             "UPDATE structures SET label=?, source=?, format=?, sha256=?, chains=?, n_residues=?, "
             "file_path=?, pae_path=?, provenance=? WHERE id=?",
             (label, source, fmt, sio.sha256(data), json.dumps(chains), n_res, ctx.rel(path),
-             pae_rel, json.dumps(_provenance(exp_id, source, refreshed=True)), row["id"]),
+             pae_rel,
+             json.dumps(_provenance(exp_id, source, refreshed=True, pae_attached=keep_attached)),
+             row["id"]),
         )
 
 
@@ -208,6 +237,9 @@ def _differs(ctx, row, *, sha: str, label: str, source: str, path: Path,
         return True
     if row["file_path"] != ctx.rel(path):
         return True
+    if pae is None and row["pae_path"] and pae_was_attached_by_a_person(row):
+        # Not a difference to reconcile: the bundle never claimed to have one.
+        return False
     if (pae is None) != (not row["pae_path"]):
         return True
     if pae is not None:

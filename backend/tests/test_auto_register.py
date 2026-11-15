@@ -185,3 +185,106 @@ def test_non_structure_outputs_are_left_alone(client):
     body = client.post("/api/experiments/reindex").json()
     assert body["errors"] == []
     assert structures(client) == []
+
+
+def _attach_pae(client, sid, n):
+    pae = {"predicted_aligned_error": [[2.0] * n for _ in range(n)],
+           "max_predicted_aligned_error": 31.75}
+    return client.post(f"/api/structures/{sid}/pae",
+                       files={"file": ("m.pae.json", json.dumps(pae).encode(), "application/json")})
+
+
+def test_a_rescan_does_not_delete_a_pae_someone_attached_by_hand(client, pdb_text):
+    """Found by using the app, not by a test.
+
+    Attach a PAE to a structure that came from a bundle, press rescan in
+    Settings, and the matrix was gone: the refresh made the row match the
+    bundle exactly, and the bundle never had a PAE. That is data loss wearing
+    the clothes of reconciliation. A PAE a person uploaded is now marked as
+    theirs and survives.
+    """
+    write_experiment(
+        client, "exp-keep-pae",
+        outputs=[{"type": "structure", "path": "structures/k.pdb", "source": "predicted"}],
+        files={"structures/k.pdb": pdb_text},
+    )
+    client.post("/api/experiments/reindex")
+    row = structures(client)[0]
+    n = row["n_residues"]
+    assert _attach_pae(client, row["id"], n).status_code == 201
+    assert client.get(f"/api/structures/{row['id']}/pae").status_code == 200
+
+    for _ in range(3):
+        client.post("/api/experiments/reindex")
+
+    got = client.get(f"/api/structures/{row['id']}/pae")
+    assert got.status_code == 200, "the rescan deleted a PAE a person attached"
+    assert got.json()["size"] == n
+    assert client.get(f"/api/structures/{row['id']}").json()["has_pae"] is True
+
+
+def test_the_record_says_the_pae_was_attached_rather_than_bundled(client, pdb_text):
+    """Provenance has to carry this, or the next reader cannot tell where the
+    matrix came from -- and the refresh logic reads the same mark.
+
+    This also covers the harder path. A plain rescan now finds nothing to
+    reconcile and leaves the row alone, so the interesting case is a bundle
+    that really did change: the structure file is rewritten, the refresh runs,
+    and the hand-attached PAE still has to come through it.
+    """
+    write_experiment(
+        client, "exp-pae-prov",
+        outputs=[{"type": "structure", "path": "structures/p2.pdb", "source": "predicted"}],
+        files={"structures/p2.pdb": pdb_text},
+    )
+    client.post("/api/experiments/reindex")
+    row = structures(client)[0]
+    n = row["n_residues"]
+    _attach_pae(client, row["id"], n)
+    assert client.get(f"/api/structures/{row['id']}").json()["provenance"]["pae_attached_by_user"] is True
+
+    # the bundle re-exports the same structure under a new label: a real change
+    write_experiment(
+        client, "exp-pae-prov",
+        outputs=[{"type": "structure", "path": "structures/p2.pdb", "source": "predicted",
+                  "label": "re-exported"}],
+        files={"structures/p2.pdb": pdb_text},
+    )
+    client.post("/api/experiments/reindex")
+
+    got = client.get(f"/api/structures/{row['id']}/pae")
+    assert got.status_code == 200, "a refresh deleted a PAE a person attached"
+    assert got.json()["size"] == n
+    prov = client.get(f"/api/structures/{row['id']}").json()["provenance"]
+    assert prov.get("pae_attached_by_user") is True
+    assert "attached here by a person" in prov["notes"]
+
+
+def test_a_bundle_that_later_ships_its_own_pae_wins(client, pdb_text):
+    """The bundle is the source of truth for what it exports. If a re-export
+    starts carrying a PAE, that one replaces the hand-attached matrix, and the
+    row stops claiming a person put it there."""
+    write_experiment(
+        client, "exp-pae-wins",
+        outputs=[{"type": "structure", "path": "structures/w.pdb", "source": "predicted"}],
+        files={"structures/w.pdb": pdb_text},
+    )
+    client.post("/api/experiments/reindex")
+    row = structures(client)[0]
+    n = row["n_residues"]
+    _attach_pae(client, row["id"], n)
+
+    bundled = {"predicted_aligned_error": [[9.0] * n for _ in range(n)],
+               "max_predicted_aligned_error": 31.75}
+    write_experiment(
+        client, "exp-pae-wins",
+        outputs=[{"type": "structure", "path": "structures/w.pdb", "source": "predicted"},
+                 {"type": "pae", "path": "structures/w.pae.json"}],
+        files={"structures/w.pdb": pdb_text, "structures/w.pae.json": json.dumps(bundled)},
+    )
+    client.post("/api/experiments/reindex")
+
+    got = client.get(f"/api/structures/{row['id']}/pae").json()
+    assert got["matrix"][0][0] == 9.0, "the bundle's own PAE should win"
+    prov = client.get(f"/api/structures/{row['id']}").json()["provenance"]
+    assert not prov.get("pae_attached_by_user")
