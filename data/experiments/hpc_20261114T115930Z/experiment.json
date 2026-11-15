@@ -1,0 +1,465 @@
+{
+  "created_at": "2026-11-14T12:04:34+00:00",
+  "error": "stage recorded a stage_start but no stage_end: the job died without running its exit handler (out of time, OOM-killed, or node failure)",
+  "id": "hpc_20261114T115930Z",
+  "inputs": [],
+  "kind": "executed",
+  "metrics": {
+    "backbone_n_residues_max": 60,
+    "backbone_n_residues_min": 60,
+    "mpnn_best_score": 1.1507,
+    "mpnn_mean_score": 1.1507,
+    "mpnn_model_name": "v_48_020",
+    "mpnn_seed": 37,
+    "n_backbones": 1,
+    "n_sequences_designed": 1,
+    "predicted_best_mean_plddt": 83.69,
+    "predicted_mean_plddt": 60.79,
+    "predicted_mean_ptm": 0.3786,
+    "self_consistency_atom_type": "CA",
+    "self_consistency_ca_rmsd_best": 13.282,
+    "self_consistency_ca_rmsd_mean": 18.343,
+    "stage_predict_esmfold_wall_seconds": 54.252,
+    "stage_proteinmpnn_wall_seconds": 4.304,
+    "stage_rfdiffusion_wall_seconds": 70.381
+  },
+  "metrics_unavailable": {
+    "mpnn_mean_seq_recovery": "ProteinMPNN reported seq_recovery, but it is measured against the input PDB's own sequence, and an RFdiffusion backbone has no native sequence to recover. Reporting it would imply a comparison that was not made."
+  },
+  "model_name": "RFdiffusion + ProteinMPNN + ESMFold",
+  "model_version": "RFdiffusion@86507b6538f5; ProteinMPNN@8907e6671bfb; ProteinMPNN model v_48_020; esmfold_v1",
+  "outputs": [
+    "structures/design_0.pdb",
+    "sequences/design_0.fa",
+    "structures/design_0_s0.pdb",
+    "structures/design_0_s0.pae.json",
+    "structures/design_0_s1.pdb",
+    "structures/design_0_s1.pae.json"
+  ],
+  "per_design": [
+    {
+      "file": "structures/design_0_s0.pdb",
+      "mean_plddt": 37.88182067871094,
+      "mean_plddt_source": "predictor sidecar (<name>.pred.json)",
+      "n_residues": 60,
+      "name": "design_0_s0",
+      "pae_file": "structures/design_0_s0.pae.json",
+      "ptm": 0.1663,
+      "scrmsd": {
+        "aligned_atoms": 60,
+        "aligned_residues": 60,
+        "atom_type": "CA",
+        "backbone": "design_0.pdb",
+        "reason": null,
+        "rmsd": 13.282
+      }
+    },
+    {
+      "file": "structures/design_0_s1.pdb",
+      "mean_plddt": 83.69172668457031,
+      "mean_plddt_source": "predictor sidecar (<name>.pred.json)",
+      "n_residues": 60,
+      "name": "design_0_s1",
+      "pae_file": "structures/design_0_s1.pae.json",
+      "ptm": 0.591,
+      "scrmsd": {
+        "aligned_atoms": 60,
+        "aligned_residues": 60,
+        "atom_type": "CA",
+        "backbone": "design_0.pdb",
+        "reason": null,
+        "rmsd": 23.404
+      }
+    }
+  ],
+  "provenance": {
+    "notes": "Executed by the FoldStudio Stream 3 pipeline (hosts: compute-12-16.mill, gpu-15-24.mill, gpu-15-32.mill, mill-login-p1.mill; Slurm job id(s) 2747019, 2747020, 2747021, 2747022). Stages: driver=ran exit=0; rfdiffusion=ran exit=0; proteinmpnn=ran exit=0; predict_esmfold=ran exit=0; export_bundle=ran exit=None Backbones are registered as source 'uploaded', not 'predicted': a designed backbone carries no pLDDT, and its B-factor column must not be read as confidence. pLDDT, PAE and pTM are the model's own confidence estimates. They are not evidence of folding, binding, affinity, efficacy, safety or biological function. Self-consistency RMSD compares a designed backbone with a structure predicted from the designed sequence. It measures agreement between two computational models, not experimental validation. FoldStudio is not a clinical tool and this bundle is not evidence for any therapeutic use. No binder or therapeutic design was performed: the design target is an unconditional monomeric scaffold with no binding partner.",
+    "retrieved_at": "2026-11-14T12:04:34+00:00",
+    "source": "FoldStudio HPC pipeline",
+    "url": null
+  },
+  "settings": {
+    "account": "",
+    "contig": "",
+    "cpus": "",
+    "env_mode": "",
+    "gpu_gres": "gpu:V100-SXM2-32GB:1",
+    "mem": "",
+    "mpnn_model": "",
+    "mpnn_temp": "",
+    "num_designs": "1",
+    "partition": "requeue",
+    "predictor": "",
+    "rfdiffusion_seed_mechanism": "inference.deterministic=True; RFdiffusion's stock config exposes no per-design seed, so a design regenerated after a preemption is not guaranteed bit-identical to the same index inside one uninterrupted multi-design run.",
+    "seed": "",
+    "seeds": {
+      "base": 37,
+      "design_0": 37,
+      "per_design_seed_flag": null,
+      "rfdiffusion_mechanism": "inference.deterministic=True"
+    },
+    "seqs_per_design": "1",
+    "signal_sec": "",
+    "time_cpu": "",
+    "time_gpu": ""
+  },
+  "stage_summary": {
+    "driver": {
+      "attempts": 1,
+      "checkpoints": 0,
+      "completed": true,
+      "ended_at": "2026-11-14T11:59:57+00:00",
+      "error": null,
+      "event_count": 8,
+      "exit_status": 0,
+      "git": {
+        "foldstudio": "b40729b8e6992dfefba0cc4e80bf6101b862e9e9",
+        "proteinmpnn": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+        "rfdiffusion": "86507b6538f51fce57b5a72477165f03999ed7ae"
+      },
+      "hosts": [
+        "mill-login-p1.mill"
+      ],
+      "items_done": [],
+      "notes": [
+        "tool versions collected",
+        "driver submitted 4 jobs: 2747019 2747020 2747021 2747022"
+      ],
+      "outputs": [
+        "2747019",
+        "2747020",
+        "2747021",
+        "2747022"
+      ],
+      "preemptions": 0,
+      "ran": true,
+      "seeds": {},
+      "settings": {
+        "account": "",
+        "contig": "",
+        "cpus": "",
+        "env_mode": "",
+        "gpu_gres": "gpu:V100-SXM2-32GB:1",
+        "mem": "",
+        "mpnn_model": "",
+        "mpnn_temp": "",
+        "num_designs": "1",
+        "partition": "requeue",
+        "predictor": "",
+        "seed": "",
+        "seqs_per_design": "1",
+        "signal_sec": "",
+        "time_cpu": "",
+        "time_gpu": ""
+      },
+      "slurm": {
+        "submitted_fs-export": "2747022",
+        "submitted_fs-mpnn": "2747020",
+        "submitted_fs-pred": "2747021",
+        "submitted_fs-rfd": "2747019"
+      },
+      "stage": "driver",
+      "started_at": "2026-11-14T11:59:30+00:00",
+      "tool_versions": {
+        "cuda_module": "cuda-toolkit/12.9",
+        "nvidia_smi": "\nnvidia-smi_unavailable",
+        "python": "Python 3.12.2",
+        "torch": "2.3.0+cu121 cuda 12.1 available False"
+      },
+      "wall_seconds": null
+    },
+    "export_bundle": {
+      "attempts": 1,
+      "checkpoints": 0,
+      "completed": false,
+      "ended_at": null,
+      "error": "stage recorded a stage_start but no stage_end: the job died without running its exit handler (out of time, OOM-killed, or node failure)",
+      "event_count": 1,
+      "exit_status": null,
+      "git": {},
+      "hosts": [
+        "compute-12-16.mill"
+      ],
+      "items_done": [],
+      "notes": [],
+      "outputs": [],
+      "preemptions": 0,
+      "ran": true,
+      "seeds": {
+        "base": 37
+      },
+      "settings": {
+        "gpu_gres": "gpu:V100-SXM2-32GB:1",
+        "num_designs": "1",
+        "partition": "requeue",
+        "seqs_per_design": "1"
+      },
+      "slurm": {
+        "SLURM_CPUS_ON_NODE": "4",
+        "SLURM_JOB_ACCOUNT": "general",
+        "SLURM_JOB_ID": "2747022",
+        "SLURM_JOB_NODELIST": "compute-12-16",
+        "SLURM_JOB_PARTITION": "requeue",
+        "SLURM_JOB_QOS": "normal",
+        "SLURM_MEM_PER_NODE": "16384"
+      },
+      "stage": "export_bundle",
+      "started_at": "2026-11-14T12:04:33+00:00",
+      "tool_versions": {},
+      "wall_seconds": null
+    },
+    "predict_esmfold": {
+      "attempts": 1,
+      "checkpoints": 1,
+      "completed": true,
+      "ended_at": "2026-11-14T12:04:26+00:00",
+      "error": null,
+      "event_count": 6,
+      "exit_status": 0,
+      "git": {
+        "foldstudio": "b40729b8e6992dfefba0cc4e80bf6101b862e9e9",
+        "proteinmpnn": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+        "rfdiffusion": "86507b6538f51fce57b5a72477165f03999ed7ae"
+      },
+      "hosts": [
+        "gpu-15-24.mill"
+      ],
+      "items_done": [],
+      "notes": [
+        "loaded module cuda-toolkit/12.9",
+        "tool versions collected"
+      ],
+      "outputs": [
+        "pred/design_0_s0.pae.json",
+        "pred/design_0_s0.pdb",
+        "pred/design_0_s0.pred.json",
+        "pred/design_0_s1.pae.json",
+        "pred/design_0_s1.pdb",
+        "pred/design_0_s1.pred.json"
+      ],
+      "preemptions": 0,
+      "ran": true,
+      "seeds": {
+        "base": 37
+      },
+      "settings": {
+        "gpu_gres": "gpu:V100-SXM2-32GB:1",
+        "num_designs": "1",
+        "partition": "requeue",
+        "seqs_per_design": "1"
+      },
+      "slurm": {
+        "CUDA_VISIBLE_DEVICES": "0",
+        "SLURM_CPUS_ON_NODE": "4",
+        "SLURM_JOB_ACCOUNT": "general",
+        "SLURM_JOB_GPUS": "2",
+        "SLURM_JOB_ID": "2747021",
+        "SLURM_JOB_NODELIST": "gpu-15-24",
+        "SLURM_JOB_PARTITION": "requeue",
+        "SLURM_JOB_QOS": "normal",
+        "SLURM_MEM_PER_NODE": "49152"
+      },
+      "stage": "predict_esmfold",
+      "started_at": "2026-11-14T12:03:32+00:00",
+      "tool_versions": {
+        "cuda_module": "cuda-toolkit/12.9",
+        "nvidia_smi": "Tesla V100-SXM2-32GB, 580.196.07, 32768 MiB",
+        "python": "Python 3.9.25",
+        "torch": "2.5.1+cu121 cuda 12.1 available True"
+      },
+      "wall_seconds": 54.252
+    },
+    "proteinmpnn": {
+      "attempts": 1,
+      "checkpoints": 2,
+      "completed": true,
+      "ended_at": "2026-11-14T12:02:05+00:00",
+      "error": null,
+      "event_count": 8,
+      "exit_status": 0,
+      "git": {
+        "foldstudio": "b40729b8e6992dfefba0cc4e80bf6101b862e9e9",
+        "proteinmpnn": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+        "rfdiffusion": "86507b6538f51fce57b5a72477165f03999ed7ae"
+      },
+      "hosts": [
+        "compute-12-16.mill"
+      ],
+      "items_done": [
+        "seqs_design_0"
+      ],
+      "notes": [
+        "tool versions collected",
+        "ProteinMPNN seed for design_0 was 37"
+      ],
+      "outputs": [
+        "seqs/design_0.fa"
+      ],
+      "preemptions": 0,
+      "ran": true,
+      "seeds": {
+        "base": 37,
+        "design_0": 37
+      },
+      "settings": {
+        "gpu_gres": "gpu:V100-SXM2-32GB:1",
+        "num_designs": "1",
+        "partition": "requeue",
+        "seqs_per_design": "1"
+      },
+      "slurm": {
+        "SLURM_CPUS_ON_NODE": "4",
+        "SLURM_JOB_ACCOUNT": "general",
+        "SLURM_JOB_ID": "2747020",
+        "SLURM_JOB_NODELIST": "compute-12-16",
+        "SLURM_JOB_PARTITION": "requeue",
+        "SLURM_JOB_QOS": "normal",
+        "SLURM_MEM_PER_NODE": "16384"
+      },
+      "stage": "proteinmpnn",
+      "started_at": "2026-11-14T12:02:01+00:00",
+      "tool_versions": {
+        "cuda_module": "cuda-toolkit/12.9",
+        "nvidia_smi": "\nnvidia-smi_unavailable",
+        "python": "Python 3.9.25",
+        "torch": "1.9.1.post3 cuda None available False"
+      },
+      "wall_seconds": 4.304
+    },
+    "rfdiffusion": {
+      "attempts": 1,
+      "checkpoints": 2,
+      "completed": true,
+      "ended_at": "2026-11-14T12:01:57+00:00",
+      "error": null,
+      "event_count": 9,
+      "exit_status": 0,
+      "git": {
+        "foldstudio": "b40729b8e6992dfefba0cc4e80bf6101b862e9e9",
+        "proteinmpnn": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+        "rfdiffusion": "86507b6538f51fce57b5a72477165f03999ed7ae"
+      },
+      "hosts": [
+        "gpu-15-32.mill"
+      ],
+      "items_done": [
+        "design_0"
+      ],
+      "notes": [
+        "tool versions collected",
+        "RFdiffusion seeding: inference.deterministic=True; upstream config has no inference.seed",
+        "backbones present: 1/1"
+      ],
+      "outputs": [
+        "backbones/design_0.pdb"
+      ],
+      "preemptions": 0,
+      "ran": true,
+      "seeds": {
+        "base": 37,
+        "per_design_seed_flag": null,
+        "rfdiffusion_mechanism": "inference.deterministic=True"
+      },
+      "settings": {
+        "gpu_gres": "gpu:V100-SXM2-32GB:1",
+        "num_designs": "1",
+        "partition": "requeue",
+        "seqs_per_design": "1"
+      },
+      "slurm": {
+        "CUDA_VISIBLE_DEVICES": "0",
+        "SLURM_CPUS_ON_NODE": "4",
+        "SLURM_JOB_ACCOUNT": "general",
+        "SLURM_JOB_GPUS": "2",
+        "SLURM_JOB_ID": "2747019",
+        "SLURM_JOB_NODELIST": "gpu-15-32",
+        "SLURM_JOB_PARTITION": "requeue",
+        "SLURM_JOB_QOS": "normal",
+        "SLURM_MEM_PER_NODE": "49152"
+      },
+      "stage": "rfdiffusion",
+      "started_at": "2026-11-14T12:00:46+00:00",
+      "tool_versions": {
+        "cuda_module": "cuda-toolkit/12.9",
+        "nvidia_smi": "Tesla V100-SXM2-32GB, 580.196.07, 32768 MiB",
+        "python": "Python 3.9.25",
+        "torch": "1.9.1.post3 cuda None available False"
+      },
+      "wall_seconds": 70.381
+    }
+  },
+  "status": "partial",
+  "structure_sources": {
+    "design_0.pdb": "uploaded",
+    "design_0_s0.pdb": "predicted",
+    "design_0_s1.pdb": "predicted"
+  },
+  "workflow": [
+    {
+      "error": null,
+      "ledger_stage": null,
+      "note": "No input structure: this is de novo design, so the backbone is generated rather than supplied. Nothing is missing.",
+      "outputs": 0,
+      "preemptions": 0,
+      "stage": "Structure",
+      "status": "not_started",
+      "status_label": "not started",
+      "wall_seconds": null
+    },
+    {
+      "error": null,
+      "ledger_stage": "rfdiffusion",
+      "note": null,
+      "outputs": 1,
+      "preemptions": 0,
+      "stage": "Backbone generation",
+      "status": "executed",
+      "status_label": "executed",
+      "wall_seconds": 70.381
+    },
+    {
+      "error": null,
+      "ledger_stage": "proteinmpnn",
+      "note": null,
+      "outputs": 1,
+      "preemptions": 0,
+      "stage": "Sequence design",
+      "status": "executed",
+      "status_label": "executed",
+      "wall_seconds": 4.304
+    },
+    {
+      "error": null,
+      "ledger_stage": "predict_esmfold",
+      "note": null,
+      "outputs": 2,
+      "preemptions": 0,
+      "stage": "Structure prediction",
+      "status": "executed",
+      "status_label": "executed",
+      "wall_seconds": 54.252
+    },
+    {
+      "error": null,
+      "ledger_stage": null,
+      "note": "Computed from the bundled files: mpnn_best_score, mpnn_mean_score, predicted_best_mean_plddt, predicted_mean_plddt, predicted_mean_ptm, self_consistency_ca_rmsd_best, self_consistency_ca_rmsd_mean.",
+      "outputs": 7,
+      "preemptions": 0,
+      "stage": "Evaluation",
+      "status": "executed",
+      "status_label": "executed",
+      "wall_seconds": null
+    },
+    {
+      "error": null,
+      "ledger_stage": null,
+      "note": "Performed by a person in FoldStudio; the pipeline does not review its own candidates.",
+      "outputs": 0,
+      "preemptions": 0,
+      "stage": "Candidate review",
+      "status": "not_started",
+      "status_label": "not started",
+      "wall_seconds": null
+    }
+  ]
+}

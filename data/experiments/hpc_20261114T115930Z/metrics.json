@@ -1,0 +1,89 @@
+{
+  "caveats": [
+    "pLDDT, PAE and pTM are the model's own confidence estimates. They are not evidence of folding, binding, affinity, efficacy, safety or biological function.",
+    "Self-consistency RMSD compares a designed backbone with a structure predicted from the designed sequence. It measures agreement between two computational models, not experimental validation.",
+    "FoldStudio is not a clinical tool and this bundle is not evidence for any therapeutic use.",
+    "Every value under 'values' was computed from a file in this bundle. Nothing here is a placeholder: a metric that could not be computed appears under 'unavailable' with the reason, and is absent from 'values'."
+  ],
+  "definitions": {
+    "backbone_n_residues_max": "Most CA atoms in any backbone file here.",
+    "backbone_n_residues_min": "Fewest CA atoms in any backbone file here.",
+    "mpnn_best_score": "Lowest (best) ProteinMPNN score= value, read verbatim from the FASTA headers it wrote. Lower is better; it is a negative log-likelihood, not a probability of folding.",
+    "mpnn_mean_score": "Mean of the ProteinMPNN score= values in this bundle.",
+    "mpnn_model_name": "ProteinMPNN model name, read from its own FASTA header.",
+    "mpnn_seed": "Seed ProteinMPNN recorded in its own FASTA header.",
+    "n_backbones": "Number of backbone PDB files present in this bundle (counted, not predicted).",
+    "n_sequences_designed": "Number of ProteinMPNN design records (records carrying sample=N; the input sequence record is excluded).",
+    "predicted_best_mean_plddt": "Highest mean pLDDT among the predictions here. pLDDT, PAE and pTM are the model's own confidence estimates. They are not evidence of folding, binding, affinity, efficacy, safety or biological function.",
+    "predicted_mean_plddt": "Mean over predictions of each prediction's mean pLDDT. pLDDT, PAE and pTM are the model's own confidence estimates. They are not evidence of folding, binding, affinity, efficacy, safety or biological function.",
+    "predicted_mean_ptm": "Mean pTM reported by the predictor. pLDDT, PAE and pTM are the model's own confidence estimates. They are not evidence of folding, binding, affinity, efficacy, safety or biological function.",
+    "self_consistency_atom_type": "Atoms used for the RMSD above. The contract requires reporting which atoms were aligned; per-design atom counts are in per_design[].scrmsd.aligned_atoms.",
+    "self_consistency_ca_rmsd_best": "Lowest CA RMSD (Angstrom) between a designed backbone and the structure predicted from its designed sequence, by optimal superposition over all paired CA atoms. Self-consistency RMSD compares a designed backbone with a structure predicted from the designed sequence. It measures agreement between two computational models, not experimental validation.",
+    "self_consistency_ca_rmsd_mean": "Mean of the per-design CA RMSD values. Self-consistency RMSD compares a designed backbone with a structure predicted from the designed sequence. It measures agreement between two computational models, not experimental validation.",
+    "stage_predict_esmfold_wall_seconds": "Wall seconds the 'predict_esmfold' stage recorded for itself.",
+    "stage_proteinmpnn_wall_seconds": "Wall seconds the 'proteinmpnn' stage recorded for itself.",
+    "stage_rfdiffusion_wall_seconds": "Wall seconds the 'rfdiffusion' stage recorded for itself."
+  },
+  "experiment_id": "hpc_20261114T115930Z",
+  "generated_at": "2026-11-14T12:04:34+00:00",
+  "kind": "executed",
+  "per_design": [
+    {
+      "file": "structures/design_0_s0.pdb",
+      "mean_plddt": 37.88182067871094,
+      "mean_plddt_source": "predictor sidecar (<name>.pred.json)",
+      "n_residues": 60,
+      "name": "design_0_s0",
+      "pae_file": "structures/design_0_s0.pae.json",
+      "ptm": 0.1663,
+      "scrmsd": {
+        "aligned_atoms": 60,
+        "aligned_residues": 60,
+        "atom_type": "CA",
+        "backbone": "design_0.pdb",
+        "reason": null,
+        "rmsd": 13.282
+      }
+    },
+    {
+      "file": "structures/design_0_s1.pdb",
+      "mean_plddt": 83.69172668457031,
+      "mean_plddt_source": "predictor sidecar (<name>.pred.json)",
+      "n_residues": 60,
+      "name": "design_0_s1",
+      "pae_file": "structures/design_0_s1.pae.json",
+      "ptm": 0.591,
+      "scrmsd": {
+        "aligned_atoms": 60,
+        "aligned_residues": 60,
+        "atom_type": "CA",
+        "backbone": "design_0.pdb",
+        "reason": null,
+        "rmsd": 23.404
+      }
+    }
+  ],
+  "status": "partial",
+  "unavailable": {
+    "mpnn_mean_seq_recovery": "ProteinMPNN reported seq_recovery, but it is measured against the input PDB's own sequence, and an RFdiffusion backbone has no native sequence to recover. Reporting it would imply a comparison that was not made."
+  },
+  "values": {
+    "backbone_n_residues_max": 60,
+    "backbone_n_residues_min": 60,
+    "mpnn_best_score": 1.1507,
+    "mpnn_mean_score": 1.1507,
+    "mpnn_model_name": "v_48_020",
+    "mpnn_seed": 37,
+    "n_backbones": 1,
+    "n_sequences_designed": 1,
+    "predicted_best_mean_plddt": 83.69,
+    "predicted_mean_plddt": 60.79,
+    "predicted_mean_ptm": 0.3786,
+    "self_consistency_atom_type": "CA",
+    "self_consistency_ca_rmsd_best": 13.282,
+    "self_consistency_ca_rmsd_mean": 18.343,
+    "stage_predict_esmfold_wall_seconds": 54.252,
+    "stage_proteinmpnn_wall_seconds": 4.304,
+    "stage_rfdiffusion_wall_seconds": 70.381
+  }
+}

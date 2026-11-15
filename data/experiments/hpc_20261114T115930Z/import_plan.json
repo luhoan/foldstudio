@@ -1,0 +1,67 @@
+{
+  "experiment_id": "hpc_20261114T115930Z",
+  "files_copied_into_data": [
+    "structures/hpc_20261114T115930Z/design_0.pdb",
+    "structures/hpc_20261114T115930Z/design_0_s0.pdb",
+    "pae/hpc_20261114T115930Z/design_0_s0.pae.json",
+    "structures/hpc_20261114T115930Z/design_0_s1.pdb",
+    "pae/hpc_20261114T115930Z/design_0_s1.pae.json"
+  ],
+  "generated_at": "2026-11-14T12:04:34+00:00",
+  "notes": [
+    "POST /api/structures/register requires the file to already sit under data/structures/, which --copy-structures (default) has done.",
+    "Backbones register as source 'uploaded' on purpose: GET /structures/{id}/plddt must refuse them, because their B-factors are not pLDDT."
+  ],
+  "steps": [
+    {
+      "method": "POST",
+      "order": 1,
+      "path": "/api/experiments/reindex",
+      "why": "loads data/experiments/*/experiment.json, using the directory name as the id"
+    },
+    {
+      "calls": [
+        {
+          "body": {
+            "label": "design_0 (RFdiffusion backbone)",
+            "notes": "Designed backbone from RFdiffusion; the B-factor column is NOT pLDDT.",
+            "origin_id": "hpc_20261114T115930Z:design_0.pdb",
+            "path": "hpc_20261114T115930Z/design_0.pdb",
+            "source": "uploaded"
+          },
+          "local_file": "structures/design_0.pdb",
+          "method": "POST",
+          "path": "/api/structures/register"
+        },
+        {
+          "body": {
+            "label": "design_0_s0 (predicted structure)",
+            "notes": "model wrote 0-100 already; left unchanged pLDDT, PAE and pTM are the model's own confidence estimates. They are not evidence of folding, binding, affinity, efficacy, safety or biological function.",
+            "origin_id": "hpc_20261114T115930Z:design_0_s0.pdb",
+            "pae_path": "hpc_20261114T115930Z/design_0_s0.pae.json",
+            "path": "hpc_20261114T115930Z/design_0_s0.pdb",
+            "source": "predicted"
+          },
+          "local_file": "structures/design_0_s0.pdb",
+          "method": "POST",
+          "path": "/api/structures/register"
+        },
+        {
+          "body": {
+            "label": "design_0_s1 (predicted structure)",
+            "notes": "model wrote 0-100 already; left unchanged pLDDT, PAE and pTM are the model's own confidence estimates. They are not evidence of folding, binding, affinity, efficacy, safety or biological function.",
+            "origin_id": "hpc_20261114T115930Z:design_0_s1.pdb",
+            "pae_path": "hpc_20261114T115930Z/design_0_s1.pae.json",
+            "path": "hpc_20261114T115930Z/design_0_s1.pdb",
+            "source": "predicted"
+          },
+          "local_file": "structures/design_0_s1.pdb",
+          "method": "POST",
+          "path": "/api/structures/register"
+        }
+      ],
+      "note": "register the structure files so the viewer can open them",
+      "order": 2
+    }
+  ]
+}

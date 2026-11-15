@@ -1,0 +1,42 @@
+{
+  "experiment.json": {
+    "bytes": 14865,
+    "sha256": "c8c2348af652e6e6e80a7bc6854e977920aa57cc9433ad54833a6d82f37fe95d"
+  },
+  "metrics.json": {
+    "bytes": 5426,
+    "sha256": "f9586199c171ec29ab974d258b21afb3996a3a67bab2d331fc5b9c00219f47c8"
+  },
+  "provenance/events.jsonl": {
+    "bytes": 12683,
+    "sha256": "5cfdb32dda47df432a132dd078b92818e463f93209b84b0cbcaf86157af4b74f"
+  },
+  "provenance/stages.json": {
+    "bytes": 13475,
+    "sha256": "11e2be2c1e345ea75810bfc4d1fb5b2a7513975459543f85e89850208b241381"
+  },
+  "sequences/design_0.fa": {
+    "bytes": 361,
+    "sha256": "551d1c63ee28882ecb3a9d45dcc009ee5544d4c79d8c7d5a146a0c7932ce770b"
+  },
+  "structures/design_0.pdb": {
+    "bytes": 16080,
+    "sha256": "adeafb486bbedacce48b95a90a592f67eb3c1cff5f6016ec088d371e5ffb5896"
+  },
+  "structures/design_0_s0.pae.json": {
+    "bytes": 24311,
+    "sha256": "35bc4639c2e579416708322a13337755975a4cdf83bb4dc59008ea72d5f3d5e4"
+  },
+  "structures/design_0_s0.pdb": {
+    "bytes": 19482,
+    "sha256": "baef0ddc44a36f4f00a31b5fa1095068d502c3630a6ad786c210ec79a7103be5"
+  },
+  "structures/design_0_s1.pae.json": {
+    "bytes": 21631,
+    "sha256": "96bf5dc524c51918d67cadbdfc9f6439f0380b1fdc8db66ec38ccdd7cce1ffaf"
+  },
+  "structures/design_0_s1.pdb": {
+    "bytes": 42162,
+    "sha256": "8a9366b8564f3dd7eba460d389341d6ee364d409734427315267970ee077fd31"
+  }
+}

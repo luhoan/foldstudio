@@ -1,0 +1,462 @@
+{
+  "driver": {
+    "attempts": 1,
+    "checkpoints": 0,
+    "commands": [
+      {
+        "argv": [
+          "sbatch",
+          "--partition=requeue",
+          "--requeue",
+          "--open-mode=append",
+          "--signal=B:USR1@120",
+          "--output=/home/lhwwv/foldstudio-hpc/runs/20261114T115930Z/logs/fs-rfd-%j.out",
+          "--error=/home/lhwwv/foldstudio-hpc/runs/20261114T115930Z/logs/fs-rfd-%j.out",
+          "--export=ALL,FS_RUN_ID=20261114T115930Z,FS_REPO=/home/lhwwv/foldstudio",
+          "--job-name=fs-rfd",
+          "--gres=gpu:V100-SXM2-32GB:1",
+          "--time=03:45:00",
+          "--cpus-per-task=4",
+          "--mem=48G",
+          "--parsable",
+          "/home/lhwwv/foldstudio/hpc/20_rfdiffusion.sbatch"
+        ],
+        "cwd": null,
+        "exit": 0,
+        "log": null,
+        "name": "submit_fs-rfd",
+        "ts": "2026-11-14T11:59:57+00:00",
+        "wall_seconds": null
+      },
+      {
+        "argv": [
+          "sbatch",
+          "--partition=requeue",
+          "--requeue",
+          "--open-mode=append",
+          "--signal=B:USR1@120",
+          "--output=/home/lhwwv/foldstudio-hpc/runs/20261114T115930Z/logs/fs-mpnn-%j.out",
+          "--error=/home/lhwwv/foldstudio-hpc/runs/20261114T115930Z/logs/fs-mpnn-%j.out",
+          "--export=ALL,FS_RUN_ID=20261114T115930Z,FS_REPO=/home/lhwwv/foldstudio",
+          "--job-name=fs-mpnn",
+          "--time=01:00:00",
+          "--cpus-per-task=4",
+          "--mem=16G",
+          "--dependency=afterok:2747019",
+          "--parsable",
+          "/home/lhwwv/foldstudio/hpc/30_proteinmpnn.sbatch"
+        ],
+        "cwd": null,
+        "exit": 0,
+        "log": null,
+        "name": "submit_fs-mpnn",
+        "ts": "2026-11-14T11:59:57+00:00",
+        "wall_seconds": null
+      },
+      {
+        "argv": [
+          "sbatch",
+          "--partition=requeue",
+          "--requeue",
+          "--open-mode=append",
+          "--signal=B:USR1@120",
+          "--output=/home/lhwwv/foldstudio-hpc/runs/20261114T115930Z/logs/fs-pred-%j.out",
+          "--error=/home/lhwwv/foldstudio-hpc/runs/20261114T115930Z/logs/fs-pred-%j.out",
+          "--export=ALL,FS_RUN_ID=20261114T115930Z,FS_REPO=/home/lhwwv/foldstudio",
+          "--job-name=fs-pred",
+          "--gres=gpu:V100-SXM2-32GB:1",
+          "--time=03:45:00",
+          "--cpus-per-task=4",
+          "--mem=48G",
+          "--dependency=afterok:2747020",
+          "--parsable",
+          "/home/lhwwv/foldstudio/hpc/40_predict.sbatch"
+        ],
+        "cwd": null,
+        "exit": 0,
+        "log": null,
+        "name": "submit_fs-pred",
+        "ts": "2026-11-14T11:59:57+00:00",
+        "wall_seconds": null
+      },
+      {
+        "argv": [
+          "sbatch",
+          "--partition=requeue",
+          "--requeue",
+          "--open-mode=append",
+          "--signal=B:USR1@120",
+          "--output=/home/lhwwv/foldstudio-hpc/runs/20261114T115930Z/logs/fs-export-%j.out",
+          "--error=/home/lhwwv/foldstudio-hpc/runs/20261114T115930Z/logs/fs-export-%j.out",
+          "--export=ALL,FS_RUN_ID=20261114T115930Z,FS_REPO=/home/lhwwv/foldstudio",
+          "--job-name=fs-export",
+          "--time=01:00:00",
+          "--cpus-per-task=4",
+          "--mem=16G",
+          "--dependency=afterok:2747021",
+          "--parsable",
+          "/home/lhwwv/foldstudio/hpc/50_export.sbatch"
+        ],
+        "cwd": null,
+        "exit": 0,
+        "log": null,
+        "name": "submit_fs-export",
+        "ts": "2026-11-14T11:59:57+00:00",
+        "wall_seconds": null
+      }
+    ],
+    "completed": true,
+    "ended_at": "2026-11-14T11:59:57+00:00",
+    "error": null,
+    "event_count": 8,
+    "exit_status": 0,
+    "git": {
+      "foldstudio": "b40729b8e6992dfefba0cc4e80bf6101b862e9e9",
+      "proteinmpnn": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+      "rfdiffusion": "86507b6538f51fce57b5a72477165f03999ed7ae"
+    },
+    "hosts": [
+      "mill-login-p1.mill"
+    ],
+    "items_done": [],
+    "notes": [
+      "tool versions collected",
+      "driver submitted 4 jobs: 2747019 2747020 2747021 2747022"
+    ],
+    "outputs": [
+      "2747019",
+      "2747020",
+      "2747021",
+      "2747022"
+    ],
+    "preemptions": 0,
+    "ran": true,
+    "seeds": {},
+    "settings": {
+      "account": "",
+      "contig": "",
+      "cpus": "",
+      "env_mode": "",
+      "gpu_gres": "gpu:V100-SXM2-32GB:1",
+      "mem": "",
+      "mpnn_model": "",
+      "mpnn_temp": "",
+      "num_designs": "1",
+      "partition": "requeue",
+      "predictor": "",
+      "seed": "",
+      "seqs_per_design": "1",
+      "signal_sec": "",
+      "time_cpu": "",
+      "time_gpu": ""
+    },
+    "slurm": {
+      "submitted_fs-export": "2747022",
+      "submitted_fs-mpnn": "2747020",
+      "submitted_fs-pred": "2747021",
+      "submitted_fs-rfd": "2747019"
+    },
+    "stage": "driver",
+    "started_at": "2026-11-14T11:59:30+00:00",
+    "tool_versions": {
+      "cuda_module": "cuda-toolkit/12.9",
+      "nvidia_smi": "\nnvidia-smi_unavailable",
+      "python": "Python 3.12.2",
+      "torch": "2.3.0+cu121 cuda 12.1 available False"
+    },
+    "wall_seconds": null
+  },
+  "export_bundle": {
+    "attempts": 1,
+    "checkpoints": 0,
+    "commands": [],
+    "completed": false,
+    "ended_at": null,
+    "error": "stage recorded a stage_start but no stage_end: the job died without running its exit handler (out of time, OOM-killed, or node failure)",
+    "event_count": 1,
+    "exit_status": null,
+    "git": {},
+    "hosts": [
+      "compute-12-16.mill"
+    ],
+    "items_done": [],
+    "notes": [],
+    "outputs": [],
+    "preemptions": 0,
+    "ran": true,
+    "seeds": {
+      "base": 37
+    },
+    "settings": {
+      "gpu_gres": "gpu:V100-SXM2-32GB:1",
+      "num_designs": "1",
+      "partition": "requeue",
+      "seqs_per_design": "1"
+    },
+    "slurm": {
+      "SLURM_CPUS_ON_NODE": "4",
+      "SLURM_JOB_ACCOUNT": "general",
+      "SLURM_JOB_ID": "2747022",
+      "SLURM_JOB_NODELIST": "compute-12-16",
+      "SLURM_JOB_PARTITION": "requeue",
+      "SLURM_JOB_QOS": "normal",
+      "SLURM_MEM_PER_NODE": "16384"
+    },
+    "stage": "export_bundle",
+    "started_at": "2026-11-14T12:04:33+00:00",
+    "tool_versions": {},
+    "wall_seconds": null
+  },
+  "predict_esmfold": {
+    "attempts": 1,
+    "checkpoints": 1,
+    "commands": [
+      {
+        "argv": [
+          "python",
+          "/home/lhwwv/foldstudio/hpc/predict_esmfold.py",
+          "--fasta=/home/lhwwv/foldstudio-hpc/runs/20261114T115930Z/seqs/design_0.fa",
+          "--out-dir",
+          "/home/lhwwv/foldstudio-hpc/runs/20261114T115930Z/pred",
+          "--chunk-size",
+          "128",
+          "--skip-existing"
+        ],
+        "cwd": "/home/lhwwv/foldstudio/hpc",
+        "exit": 0,
+        "log": "logs/predict_esmfold.esmfold.log",
+        "name": "esmfold",
+        "ts": "2026-11-14T12:04:26+00:00",
+        "wall_seconds": 48.326
+      }
+    ],
+    "completed": true,
+    "ended_at": "2026-11-14T12:04:26+00:00",
+    "error": null,
+    "event_count": 6,
+    "exit_status": 0,
+    "git": {
+      "foldstudio": "b40729b8e6992dfefba0cc4e80bf6101b862e9e9",
+      "proteinmpnn": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+      "rfdiffusion": "86507b6538f51fce57b5a72477165f03999ed7ae"
+    },
+    "hosts": [
+      "gpu-15-24.mill"
+    ],
+    "items_done": [],
+    "notes": [
+      "loaded module cuda-toolkit/12.9",
+      "tool versions collected"
+    ],
+    "outputs": [
+      "pred/design_0_s0.pae.json",
+      "pred/design_0_s0.pdb",
+      "pred/design_0_s0.pred.json",
+      "pred/design_0_s1.pae.json",
+      "pred/design_0_s1.pdb",
+      "pred/design_0_s1.pred.json"
+    ],
+    "preemptions": 0,
+    "ran": true,
+    "seeds": {
+      "base": 37
+    },
+    "settings": {
+      "gpu_gres": "gpu:V100-SXM2-32GB:1",
+      "num_designs": "1",
+      "partition": "requeue",
+      "seqs_per_design": "1"
+    },
+    "slurm": {
+      "CUDA_VISIBLE_DEVICES": "0",
+      "SLURM_CPUS_ON_NODE": "4",
+      "SLURM_JOB_ACCOUNT": "general",
+      "SLURM_JOB_GPUS": "2",
+      "SLURM_JOB_ID": "2747021",
+      "SLURM_JOB_NODELIST": "gpu-15-24",
+      "SLURM_JOB_PARTITION": "requeue",
+      "SLURM_JOB_QOS": "normal",
+      "SLURM_MEM_PER_NODE": "49152"
+    },
+    "stage": "predict_esmfold",
+    "started_at": "2026-11-14T12:03:32+00:00",
+    "tool_versions": {
+      "cuda_module": "cuda-toolkit/12.9",
+      "nvidia_smi": "Tesla V100-SXM2-32GB, 580.196.07, 32768 MiB",
+      "python": "Python 3.9.25",
+      "torch": "2.5.1+cu121 cuda 12.1 available True"
+    },
+    "wall_seconds": 54.252
+  },
+  "proteinmpnn": {
+    "attempts": 1,
+    "checkpoints": 2,
+    "commands": [
+      {
+        "argv": [
+          "python",
+          "/home/lhwwv/foldstudio-hpc/tools/ProteinMPNN/protein_mpnn_run.py",
+          "--pdb_path",
+          "/home/lhwwv/foldstudio-hpc/runs/20261114T115930Z/backbones/design_0.pdb",
+          "--pdb_path_chains",
+          "A",
+          "--out_folder",
+          "/local/scratch/lhwwv/20261114T115930Z/proteinmpnn/mpnn/design_0",
+          "--num_seq_per_target",
+          "1",
+          "--sampling_temp",
+          "0.1",
+          "--seed",
+          "37",
+          "--batch_size",
+          "1",
+          "--model_name",
+          "v_48_020",
+          "--save_score",
+          "1"
+        ],
+        "cwd": "/home/lhwwv/foldstudio/hpc",
+        "exit": 0,
+        "log": "logs/proteinmpnn.seqs_design_0.log",
+        "name": "seqs_design_0",
+        "ts": "2026-11-14T12:02:04+00:00",
+        "wall_seconds": 1.224
+      }
+    ],
+    "completed": true,
+    "ended_at": "2026-11-14T12:02:05+00:00",
+    "error": null,
+    "event_count": 8,
+    "exit_status": 0,
+    "git": {
+      "foldstudio": "b40729b8e6992dfefba0cc4e80bf6101b862e9e9",
+      "proteinmpnn": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+      "rfdiffusion": "86507b6538f51fce57b5a72477165f03999ed7ae"
+    },
+    "hosts": [
+      "compute-12-16.mill"
+    ],
+    "items_done": [
+      "seqs_design_0"
+    ],
+    "notes": [
+      "tool versions collected",
+      "ProteinMPNN seed for design_0 was 37"
+    ],
+    "outputs": [
+      "seqs/design_0.fa"
+    ],
+    "preemptions": 0,
+    "ran": true,
+    "seeds": {
+      "base": 37,
+      "design_0": 37
+    },
+    "settings": {
+      "gpu_gres": "gpu:V100-SXM2-32GB:1",
+      "num_designs": "1",
+      "partition": "requeue",
+      "seqs_per_design": "1"
+    },
+    "slurm": {
+      "SLURM_CPUS_ON_NODE": "4",
+      "SLURM_JOB_ACCOUNT": "general",
+      "SLURM_JOB_ID": "2747020",
+      "SLURM_JOB_NODELIST": "compute-12-16",
+      "SLURM_JOB_PARTITION": "requeue",
+      "SLURM_JOB_QOS": "normal",
+      "SLURM_MEM_PER_NODE": "16384"
+    },
+    "stage": "proteinmpnn",
+    "started_at": "2026-11-14T12:02:01+00:00",
+    "tool_versions": {
+      "cuda_module": "cuda-toolkit/12.9",
+      "nvidia_smi": "\nnvidia-smi_unavailable",
+      "python": "Python 3.9.25",
+      "torch": "1.9.1.post3 cuda None available False"
+    },
+    "wall_seconds": 4.304
+  },
+  "rfdiffusion": {
+    "attempts": 1,
+    "checkpoints": 2,
+    "commands": [
+      {
+        "argv": [
+          "python",
+          "/home/lhwwv/foldstudio-hpc/tools/RFdiffusion/scripts/run_inference.py",
+          "inference.output_prefix=/local/scratch/lhwwv/20261114T115930Z/rfdiffusion/out/design",
+          "contigmap.contigs=[60-60]",
+          "inference.num_designs=1",
+          "inference.design_startnum=0",
+          "inference.model_directory_path=/home/lhwwv/foldstudio-hpc/weights/rfdiffusion",
+          "inference.deterministic=True",
+          "inference.write_trajectory=False"
+        ],
+        "cwd": "/home/lhwwv/foldstudio-hpc/tools/RFdiffusion",
+        "exit": 0,
+        "log": "logs/rfdiffusion.design_0.log",
+        "name": "design_0",
+        "ts": "2026-11-14T12:01:56+00:00",
+        "wall_seconds": 68.264
+      }
+    ],
+    "completed": true,
+    "ended_at": "2026-11-14T12:01:57+00:00",
+    "error": null,
+    "event_count": 9,
+    "exit_status": 0,
+    "git": {
+      "foldstudio": "b40729b8e6992dfefba0cc4e80bf6101b862e9e9",
+      "proteinmpnn": "8907e6671bfbfc92303b5f79c4b5e6ce47cdef57",
+      "rfdiffusion": "86507b6538f51fce57b5a72477165f03999ed7ae"
+    },
+    "hosts": [
+      "gpu-15-32.mill"
+    ],
+    "items_done": [
+      "design_0"
+    ],
+    "notes": [
+      "tool versions collected",
+      "RFdiffusion seeding: inference.deterministic=True; upstream config has no inference.seed",
+      "backbones present: 1/1"
+    ],
+    "outputs": [
+      "backbones/design_0.pdb"
+    ],
+    "preemptions": 0,
+    "ran": true,
+    "seeds": {
+      "base": 37,
+      "per_design_seed_flag": null,
+      "rfdiffusion_mechanism": "inference.deterministic=True"
+    },
+    "settings": {
+      "gpu_gres": "gpu:V100-SXM2-32GB:1",
+      "num_designs": "1",
+      "partition": "requeue",
+      "seqs_per_design": "1"
+    },
+    "slurm": {
+      "CUDA_VISIBLE_DEVICES": "0",
+      "SLURM_CPUS_ON_NODE": "4",
+      "SLURM_JOB_ACCOUNT": "general",
+      "SLURM_JOB_GPUS": "2",
+      "SLURM_JOB_ID": "2747019",
+      "SLURM_JOB_NODELIST": "gpu-15-32",
+      "SLURM_JOB_PARTITION": "requeue",
+      "SLURM_JOB_QOS": "normal",
+      "SLURM_MEM_PER_NODE": "49152"
+    },
+    "stage": "rfdiffusion",
+    "started_at": "2026-11-14T12:00:46+00:00",
+    "tool_versions": {
+      "cuda_module": "cuda-toolkit/12.9",
+      "nvidia_smi": "Tesla V100-SXM2-32GB, 580.196.07, 32768 MiB",
+      "python": "Python 3.9.25",
+      "torch": "1.9.1.post3 cuda None available False"
+    },
+    "wall_seconds": 70.381
+  }
+}
