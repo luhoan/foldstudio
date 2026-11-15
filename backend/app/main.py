@@ -1,10 +1,12 @@
 import logging
 import os
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 
 from app.context import Context
 from app.db import init_db
@@ -38,6 +40,22 @@ def create_app(data_dir=None) -> FastAPI:
         allow_headers=["*"],
     )
 
+    # FOLDSTUDIO_DEMO=1 makes a public deployment read-only. Every write path is
+    # refused; the two POSTs the UI needs to work (alignment, experiment compare)
+    # compute from what is already loaded and write nothing, so they stay open.
+    if os.environ.get("FOLDSTUDIO_DEMO") == "1":
+        allowed_posts = {"/api/analysis/align", "/api/experiments/compare"}
+
+        @app.middleware("http")
+        async def _read_only(request: Request, call_next):
+            if request.method not in ("GET", "HEAD", "OPTIONS"):
+                if request.url.path.rstrip("/") not in allowed_posts:
+                    return JSONResponse(
+                        status_code=403,
+                        content={"detail": "demo_read_only: this deployment does not accept writes"},
+                    )
+            return await call_next(request)
+
     @app.exception_handler(AppError)
     async def _app_error(_: Request, exc: AppError):
         return JSONResponse(status_code=exc.status, content={"detail": exc.detail})
@@ -61,6 +79,31 @@ def create_app(data_dir=None) -> FastAPI:
     # fails to load is otherwise just absent from the app with nothing to say why.
     app.state.last_reindex = exp_svc.reindex(ctx)
     _log_reindex(app.state.last_reindex)
+
+    # Serve the built frontend from the same origin as the API, so one deployment
+    # answers everything and no CORS origin has to be configured. Mounted last:
+    # the catch-all below must not shadow /api/*.
+    static_dir = os.environ.get("FOLDSTUDIO_STATIC_DIR")
+    if static_dir:
+        root = Path(static_dir)
+        index = root / "index.html"
+        if not index.is_file():
+            log.warning("FOLDSTUDIO_STATIC_DIR=%s has no index.html; serving API only", root)
+        else:
+            if (root / "assets").is_dir():
+                app.mount("/assets", StaticFiles(directory=root / "assets"), name="assets")
+
+            @app.get("/{path:path}")
+            def _spa(path: str):
+                # A real file wins; anything else falls back to index.html so the
+                # client-side router owns /explorer, /analysis and the rest.
+                candidate = (root / path).resolve()
+                if path and root.resolve() in candidate.parents and candidate.is_file():
+                    return FileResponse(candidate)
+                return FileResponse(index)
+
+            log.info("serving frontend from %s", root)
+
     return app
 
 
