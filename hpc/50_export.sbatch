@@ -18,7 +18,11 @@
 #
 # It also tars the bundle so it can be copied back to a laptop in one step.
 #
-# NOT YET EXECUTED ON THE MILL -- see "What has and has not run" in hpc/README.md.
+# NOT YET EXECUTED ON THE MILL. Stages 20 and 30 have run there and exited 0,
+# and 40 was started, but no bundle has been exported from the cluster yet, so
+# nothing here has been exercised against a real ledger. The offline tests in
+# hpc/tests/test_export_bundle.py cover the exporter itself. See "What has and
+# has not run" in hpc/README.md.
 
 set -o errexit
 set -o nounset

@@ -18,7 +18,11 @@
 #   ColabFold params        ~4-5 GB
 # Run `bash hpc/11_fetch_weights.sh report` to see what you have actually used.
 #
-# NOT YET EXECUTED ON THE MILL -- see "What has and has not run" in hpc/README.md.
+# PARTLY EXECUTED ON THE MILL: the RFdiffusion weights have been fetched there
+# (stage 20 could not have exited 0 without Base_ckpt.pt). The ESMFold prefetch
+# was deliberately skipped (FS_SKIP_ESM_PREFETCH=1 -- the predictor downloads its
+# own weights on first use) and the ColabFold params have never been fetched.
+# See "What has and has not run" in hpc/README.md.
 
 set -o errexit
 set -o nounset

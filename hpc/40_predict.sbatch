@@ -29,7 +29,11 @@
 #
 # Resume: one output set per sequence; existing outputs are skipped.
 #
-# NOT YET EXECUTED ON THE MILL -- see "What has and has not run" in hpc/README.md.
+# WHAT HAS RUN ON THE MILL: the esmfold path has been started there (run
+# 20261114T115930Z) after stages 20 and 30 exited 0; the prediction was still
+# running when this session lost its view of the cluster, so its exit status is
+# UNVERIFIED. The colabfold path has never been run there. See "What has and has
+# not run" in hpc/README.md before trusting either.
 
 set -o errexit
 set -o nounset
@@ -48,10 +52,10 @@ fs_require_gpu
 fs_activate_env "${FS_PRED_ENV}"
 
 # ESMFold builds OpenFold CUDA kernels, so nvcc/CUDA must match the node.
-if command -v module >/dev/null 2>&1; then
-  module load "${FS_CUDA_MODULE}" 2>/dev/null \
-    && fs_note "loaded module ${FS_CUDA_MODULE}" \
-    || fs_note "could not load ${FS_CUDA_MODULE}; relying on the env's bundled CUDA runtime"
+if fs_module_load "${FS_CUDA_MODULE}"; then
+  fs_note "loaded module ${FS_CUDA_MODULE}"
+else
+  fs_note "could not load ${FS_CUDA_MODULE}; relying on the env's bundled CUDA runtime"
 fi
 fs_collect_versions
 

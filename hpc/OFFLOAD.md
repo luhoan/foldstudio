@@ -1,8 +1,11 @@
 # Running the GPU stages off the Mill
 
-Use this when `hpc/DISCOVERED.md` says your partition has **no GPUs** (likely if
-student access is the 4-hour `class` partition), or when ITRSS says a design
-pipeline is not acceptable use for a coursework partition.
+Use this when `hpc/DISCOVERED.md` says your partition has **no GPUs**, or when
+ITRSS says a design pipeline is not acceptable use for the partition you have.
+
+On the Mill itself neither turned out to be the case: `requeue` has V100 nodes
+and the GPU stages have run there. This document is the fallback, and it is
+**unexercised** — see "Known gaps" in [README.md](README.md).
 
 The two GPU stages — **20 RFdiffusion** and **40 prediction** — move to Colab,
 Kaggle, Princeton Adroit, or any machine with an NVIDIA GPU. The CPU stages

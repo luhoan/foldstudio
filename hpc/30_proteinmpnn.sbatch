@@ -22,7 +22,9 @@
 #
 # Resume: one invocation per backbone, with a checkpoint marker per backbone.
 #
-# NOT YET EXECUTED ON THE MILL -- see "What has and has not run" in hpc/README.md.
+# WHAT HAS RUN ON THE MILL: this stage has run there and exited 0 (run
+# 20261114T115930Z, ~4 s). See "What has and has not run" in hpc/README.md for
+# the rest of the pipeline.
 
 set -o errexit
 set -o nounset

@@ -375,6 +375,35 @@ class TestSimulatedRun(unittest.TestCase):
         self.assertTrue(exp["error"].strip())
         self.assertIn("recorded no error", exp["error"])
 
+    def test_a_run_in_which_nothing_ran_is_not_described_as_executed(self):
+        # The provenance note is prose a person reads; it must not open with
+        # "Executed by" for a run directory no stage ever started in.
+        _, exp, _ = self.build(experiment_id="hpc_sim_empty")
+        notes = exp["provenance"]["notes"]
+        self.assertNotIn("Executed by", notes)
+        self.assertIn("no design stage ran", notes)
+        self.assertIn("The ledger recorded no stage at all", notes)
+        self.assertNotEqual(exp["kind"], "executed")
+
+    def test_only_bookkeeping_in_the_ledger_is_still_not_executed_in_the_note(self):
+        # The driver and the exporter write to the ledger too; they are not design stages.
+        self.ran("driver")
+        self.ran("export_bundle")
+        _, exp, _ = self.build(experiment_id="hpc_sim_bookkeeping")
+        notes = exp["provenance"]["notes"]
+        self.assertNotIn("Executed by", notes)
+        self.assertIn("no design stage ran", notes)
+
+    def test_a_stage_that_ran_is_named_in_the_note_with_its_exit_status(self):
+        self.add_files()
+        self.ran("rfdiffusion")
+        self.ran("proteinmpnn", exit_code=3, error="boom")
+        _, exp, _ = self.build(experiment_id="hpc_sim_note")
+        notes = exp["provenance"]["notes"]
+        self.assertIn("Executed by the FoldStudio Stream 3 pipeline", notes)
+        self.assertIn("rfdiffusion=ran exit=0", notes)
+        self.assertIn("proteinmpnn=ran exit=3", notes)
+
     def test_preemptions_are_reported_as_a_metric(self):
         self.add_files()
         self.ran("rfdiffusion", preemptions=2)

@@ -4,8 +4,8 @@
 #     bash hpc/run_pipeline.sh preflight     # does this partition allow what we ask for?
 #     bash hpc/run_pipeline.sh submit        # submit stages 20->30->40->50
 #     bash hpc/run_pipeline.sh status        # squeue + per-stage ledger summary
-#     bash hpc/run_pipeline.sh resume <RUN>  # resubmit only the unfinished stages
-#     bash hpc/run_pipeline.sh export <RUN>  # build the bundle from a finished run
+#     bash hpc/run_pipeline.sh resume [RUN]  # resubmit only the unfinished stages
+#     bash hpc/run_pipeline.sh export [RUN]  # build the bundle from a finished run
 #     bash hpc/run_pipeline.sh dry-run       # offline bundle-format check, no Slurm
 #     bash hpc/run_pipeline.sh plan          # print the exact sbatch commands, submit nothing
 #
@@ -17,7 +17,14 @@
 # Run this from a LOGIN NODE. It only calls sbatch/squeue; the work happens in
 # the jobs.
 #
-# NOT YET EXECUTED ON THE MILL -- see "What has and has not run" in hpc/README.md.
+# `status`, `resume` and `export` take the newest run when no run id is given.
+#
+# Ran on the Mill on 2026-11-14 (preflight, plan, submit, status, resume); what
+# that run did and did not show is in "What has and has not run" in hpc/README.md.
+#
+# Written for bash 3.2 and BSD tools as well as the cluster's, because
+# hpc/tests/test_stage_lib.sh drives it on a laptop: no mapfile, no GNU-only
+# sed/find/grep options.
 
 set -o errexit
 set -o nounset
@@ -57,20 +64,23 @@ cpu_sbatch_args() {
 }
 
 # build_cmd <stage-file> <logname> <gpu|cpu> [dependency-jobid]
+# Prints the sbatch command, one argument per line.
 build_cmd() {
   local file="$1" logname="$2" kind="$3" dep="${4:-}"
-  local -a cmd=(sbatch)
-  mapfile -t base < <(common_sbatch_args "${logname}")
-  cmd+=("${base[@]}")
-  if [ "${kind}" = "gpu" ]; then
-    mapfile -t extra < <(gpu_sbatch_args)
-  else
-    mapfile -t extra < <(cpu_sbatch_args)
-  fi
-  cmd+=("${extra[@]}")
-  [ -n "${dep}" ] && cmd+=(--dependency="afterok:${dep}")
-  cmd+=(--parsable "${HERE}/${file}")
-  printf '%s\n' "${cmd[@]}"
+  echo sbatch
+  common_sbatch_args "${logname}"
+  if [ "${kind}" = "gpu" ]; then gpu_sbatch_args; else cpu_sbatch_args; fi
+  [ -n "${dep}" ] && echo "--dependency=afterok:${dep}"
+  echo --parsable
+  echo "${HERE}/${file}"
+}
+
+# read_cmd <stage-file> <logname> <gpu|cpu> [dependency-jobid]
+# Fills the global array CMD with that command (bash 3.2 has no mapfile).
+read_cmd() {
+  local line
+  CMD=()
+  while IFS= read -r line; do CMD+=("${line}"); done < <(build_cmd "$@")
 }
 
 # Stage table: file | log name | gpu/cpu
@@ -103,7 +113,7 @@ fs_sbatch_jobid() {
   local raw err rc=0 jid
   err="$(mktemp)"
   raw="$("$@" 2>"${err}")" || rc=$?
-  jid="$(printf '%s\n' "${raw}" | sed -n 's/^\([0-9][0-9]*\)\(;.*\)\?$/\1/p' | tail -1)"
+  jid="$(printf '%s\n' "${raw}" | sed -n -E 's/^([0-9]+)(;.*)?$/\1/p' | tail -1)"
   if [ "${rc}" -ne 0 ] || [ -z "${jid}" ]; then
     { printf '%s\n' "${raw}"; cat "${err}"; } >&2
     rm -f "${err}"
@@ -127,9 +137,9 @@ do_plan() {
   for row in "${STAGES[@]}"; do
     IFS='|' read -r file logname kind <<<"${row}"
     echo
-    mapfile -t planned < <(build_cmd "${file}" "${logname}" "${kind}" "${dep}")
-    printf '  %s' "${planned[0]}"
-    printf ' \\\n      %s' "${planned[@]:1}"
+    read_cmd "${file}" "${logname}" "${kind}" "${dep}"
+    printf '  %s' "${CMD[0]}"
+    printf ' \\\n      %s' "${CMD[@]:1}"
     echo
   done
   echo
@@ -191,6 +201,38 @@ Run 'bash hpc/00_discover.sh' and set FS_PARTITION to one you are allowed to use
 
 EOF
   fi
+  # A typed request ("gpu:V100-SXM2-32GB:1") names a GPU model. If the partition
+  # advertises GPUs but not that model, the job pends forever with
+  # "ReqNodeNotAvail" or is rejected. A bare "gpu:1" is the opposite risk.
+  local gres_type=""
+  case "${FS_GPU_GRES}" in
+    gpu:*:*) gres_type="${FS_GPU_GRES#gpu:}"; gres_type="${gres_type%:*}" ;;
+  esac
+  if [ "${want_gpu}" = "yes" ] && printf '%s' "${gres}" | grep -qi 'gpu'; then
+    if [ -n "${gres_type}" ]; then
+      if printf '%s' "${gres}" | grep -qiF "gpu:${gres_type}:"; then
+        echo "  GPU type: ${gres_type} is offered by this partition"
+      else
+        cat >&2 <<EOF
+
+  WARNING: FS_GPU_GRES asks for GPU type '${gres_type}', which partition
+  '${FS_PARTITION}' does not advertise (it lists: ${gres}).
+  The GPU stages would be rejected or pend forever. Copy the exact type from
+      sinfo -p ${FS_PARTITION} -o '%G'
+  into FS_GPU_GRES in hpc/env.local.sh.
+
+EOF
+      fi
+    else
+      cat >&2 <<EOF
+
+  NOTE: FS_GPU_GRES='${FS_GPU_GRES}' names no GPU type, so Slurm may hand out any
+  GPU this partition has (${gres}). RFdiffusion's environment cannot run on an
+  H100; name a V100 type in FS_GPU_GRES to be safe.
+
+EOF
+    fi
+  fi
   echo "  walltime: OK for both GPU and CPU stages"
   echo
   return 0
@@ -222,14 +264,14 @@ PY
   local -a submitted=()
   for row in "${STAGES[@]}"; do
     IFS='|' read -r file logname kind <<<"${row}"
-    mapfile -t cmd < <(build_cmd "${file}" "${logname}" "${kind}" "${dep}")
+    read_cmd "${file}" "${logname}" "${kind}" "${dep}"
 
     local jid rc=0 errtxt
     errtxt="$(mktemp)"
-    jid="$(fs_sbatch_jobid "${cmd[@]}" 2>"${errtxt}")" || rc=$?
+    jid="$(fs_sbatch_jobid "${CMD[@]}" 2>"${errtxt}")" || rc=$?
     if [ "${rc}" -ne 0 ]; then
       fs_event cmd --kv name="submit_${logname}" --kv host="$(hostname)" \
-        --json-kv argv="$(fs_json_array "${cmd[@]}")" --json-kv exit="${rc}" \
+        --json-kv argv="$(fs_json_array "${CMD[@]}")" --json-kv exit="${rc}" \
         --kv error="sbatch output: $(cat "${errtxt}")"
       fs_die "sbatch failed for ${file}: $(cat "${errtxt}")
 Already-submitted jobs: ${submitted[*]:-none}. Cancel them with: scancel ${submitted[*]:-}"
@@ -240,7 +282,7 @@ Already-submitted jobs: ${submitted[*]:-none}. Cancel them with: scancel ${submi
 
     # The exact submit command and the job id it produced, recorded verbatim.
     fs_event cmd --kv name="submit_${logname}" --kv host="$(hostname)" \
-      --json-kv argv="$(fs_json_array "${cmd[@]}")" --json-kv exit=0 \
+      --json-kv argv="$(fs_json_array "${CMD[@]}")" --json-kv exit=0 \
       --json-kv slurm="$(python3 - "${logname}" "${jid}" <<'PY'
 import json, sys
 print(json.dumps({f"submitted_{sys.argv[1]}": sys.argv[2]}))
@@ -270,8 +312,40 @@ PY
 # Run ids are UTC timestamps, so lexical order is chronological order.
 fs_latest_run_id() {
   [ -d "${FS_RUNS_DIR}" ] || return 0
-  find "${FS_RUNS_DIR}" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null \
-    | sort | tail -1
+  local d name latest=""
+  for d in "${FS_RUNS_DIR}"/*/; do
+    [ -d "${d}" ] || continue
+    name="${d%/}"; name="${name##*/}"
+    if [ -z "${latest}" ] || [[ "${name}" > "${latest}" ]]; then latest="${name}"; fi
+  done
+  [ -n "${latest}" ] && printf '%s\n' "${latest}"
+  return 0
+}
+
+# fs_count <dir> <glob> -- number of matching files directly in a directory.
+# (`wc -l` pads its output on BSD, so the count is taken in the shell.)
+fs_count() {
+  local n=0 f
+  for f in "$1"/$2; do [ -e "${f}" ] && n=$((n + 1)); done
+  echo "${n}"
+}
+
+# fs_use_run_arg [arg] -- point the driver at the run named by `arg`, or at the
+# newest run when `arg` is empty or is an option. Prints nothing; returns 0 when
+# the argument was a run id (so the caller can shift it away), 1 otherwise.
+fs_use_run_arg() {
+  case "${1:-}" in
+    ""|-*)
+      local latest
+      latest="$(fs_latest_run_id)"
+      [ -n "${latest}" ] || fs_die "no runs found under ${FS_RUNS_DIR}. Submit one with: bash hpc/run_pipeline.sh submit"
+      fs_set_run_id "${latest}"
+      echo "(no run id given: using the newest run, ${latest})" >&2
+      return 1 ;;
+    *)
+      fs_set_run_id "$1"
+      return 0 ;;
+  esac
 }
 
 do_status() {
@@ -286,9 +360,9 @@ do_status() {
   fi
   echo
   echo "--- files produced so far ---"
-  printf '  backbones : %s\n' "$(find "${FS_BACKBONES}" -maxdepth 1 -name '*.pdb' 2>/dev/null | wc -l)"
-  printf '  sequences : %s\n' "$(find "${FS_SEQS}" -maxdepth 1 -name '*.fa' 2>/dev/null | wc -l)"
-  printf '  predicted : %s\n' "$(find "${FS_PRED}" -maxdepth 1 -name '*.pdb' 2>/dev/null | wc -l)"
+  printf '  backbones : %s\n' "$(fs_count "${FS_BACKBONES}" '*.pdb')"
+  printf '  sequences : %s\n' "$(fs_count "${FS_SEQS}" '*.fa')"
+  printf '  predicted : %s\n' "$(fs_count "${FS_PRED}" '*.pdb')"
   echo
   if [ -f "${FS_EVENTS}" ]; then
     echo "--- ledger summary ---"
@@ -320,9 +394,9 @@ Pass the run id:  bash hpc/run_pipeline.sh resume <RUN_ID>"
   export FS_STAGE
 
   local have_bb have_seq have_pred
-  have_bb="$(find "${FS_BACKBONES}" -maxdepth 1 -name '*.pdb' 2>/dev/null | wc -l)"
-  have_seq="$(find "${FS_SEQS}" -maxdepth 1 -name '*.fa' 2>/dev/null | wc -l)"
-  have_pred="$(find "${FS_PRED}" -maxdepth 1 -name '*.pdb' 2>/dev/null | wc -l)"
+  have_bb="$(fs_count "${FS_BACKBONES}" '*.pdb')"
+  have_seq="$(fs_count "${FS_SEQS}" '*.fa')"
+  have_pred="$(fs_count "${FS_PRED}" '*.pdb')"
 
   # A stage is "done" only when it produced the number of outputs we asked for.
   local -a todo=()
@@ -338,12 +412,12 @@ Pass the run id:  bash hpc/run_pipeline.sh resume <RUN_ID>"
   local dep=""
   for row in "${todo[@]}"; do
     IFS='|' read -r file logname kind <<<"${row}"
-    mapfile -t cmd < <(build_cmd "${file}" "${logname}" "${kind}" "${dep}")
+    read_cmd "${file}" "${logname}" "${kind}" "${dep}"
     local jid
-    jid="$(fs_sbatch_jobid "${cmd[@]}")" || fs_die "sbatch failed for ${file} (sbatch's output is above)"
+    jid="$(fs_sbatch_jobid "${CMD[@]}")" || fs_die "sbatch failed for ${file} (sbatch's output is above)"
     echo "resubmitted ${file} as job ${jid}${dep:+ (after ${dep})}"
     fs_event cmd --kv name="resubmit_${logname}" --kv host="$(hostname)" \
-      --json-kv argv="$(fs_json_array "${cmd[@]}")" --json-kv exit=0
+      --json-kv argv="$(fs_json_array "${CMD[@]}")" --json-kv exit=0
     dep="${jid}"
   done
 }
@@ -403,12 +477,10 @@ case "${subcmd}" in
     fi
     do_status ;;
   resume)
-    [ -n "${1:-}" ] || fs_die "resume needs a run id: bash hpc/run_pipeline.sh resume <RUN_ID>"
-    fs_set_run_id "$1"; shift
+    if fs_use_run_arg "${1:-}"; then shift; fi
     do_resume ;;
   export)
-    [ -n "${1:-}" ] || fs_die "export needs a run id: bash hpc/run_pipeline.sh export <RUN_ID>"
-    fs_set_run_id "$1"; shift
+    if fs_use_run_arg "${1:-}"; then shift; fi
     do_export "$@" ;;
   dry-run)   do_dry_run "$@" ;;
   plan)      do_plan ;;

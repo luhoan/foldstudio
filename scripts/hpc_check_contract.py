@@ -274,13 +274,23 @@ def check_stream5_types() -> None:
         return
     with open(path, "r", encoding="utf-8") as fh:
         src = fh.read()
-    if "metrics: Record<string, number | string | null>" in src.replace("\n", " "):
-        ok("Stream 5 still declares metrics as flat scalars")
+    flat = src.replace("\n", " ")
+    # Two declarations are both fine for us. The narrow one promises flat
+    # scalars outright; the wide one (`unknown`) forces their own code to
+    # narrow each value before it is rendered, which is just as safe for a
+    # bundle that only ever writes scalars. Check A3 above is the real guard:
+    # it fails if we ever export a nested value.
+    accepted = ("metrics: Record<string, number | string | null>",
+                "metrics: Record<string, unknown>")
+    found = next((d for d in accepted if d in flat), None)
+    if found:
+        ok(f"Stream 5's metrics type still accepts flat scalars (`{found}`)")
     else:
         warn("Stream 5's metrics type may have changed",
-             "could not find `metrics: Record<string, number | string | null>` in "
-             "types.ts. If it now expects nested metrics, export_bundle.py should "
-             "be revisited.")
+             "none of the declarations we know about "
+             f"({', '.join('`%s`' % d for d in accepted)}) appear in types.ts. "
+             "If it now requires nested metrics, export_bundle.py should be "
+             "revisited.")
     for field in ("ExperimentKind", "ExperimentStatus"):
         if field in src:
             ok(f"Stream 5 still defines {field}")

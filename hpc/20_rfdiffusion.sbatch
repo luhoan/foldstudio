@@ -33,7 +33,9 @@
 # path (no ppi.hotspot_res, no target_pdb): FoldStudio's scientific-integrity
 # rules forbid novel therapeutic binder generation, so no target is involved.
 #
-# NOT YET EXECUTED ON THE MILL -- see "What has and has not run" in hpc/README.md.
+# WHAT HAS RUN ON THE MILL: this stage has run there and exited 0 (run
+# 20261114T115930Z, ~70 s on a V100-SXM2-32GB, FS_NUM_DESIGNS=1). See
+# "What has and has not run" in hpc/README.md for the rest of the pipeline.
 
 set -o errexit
 set -o nounset
@@ -54,10 +56,12 @@ fs_activate_env "${FS_RFD_ENV}"
 # The CUDA module matters for nvcc-built extensions. SE3nv brings its own
 # cudatoolkit=11.1 runtime for pytorch, so loading a system CUDA is optional
 # here; we record what happened either way.
-if [ "${FS_LOAD_CUDA_MODULE:-0}" = "1" ] && command -v module >/dev/null 2>&1; then
-  module load "${FS_CUDA_MODULE}" 2>/dev/null \
-    && fs_note "loaded module ${FS_CUDA_MODULE}" \
-    || fs_note "could not load module ${FS_CUDA_MODULE}; using the env's bundled CUDA runtime"
+if [ "${FS_LOAD_CUDA_MODULE:-0}" = "1" ]; then
+  if fs_module_load "${FS_CUDA_MODULE}"; then
+    fs_note "loaded module ${FS_CUDA_MODULE}"
+  else
+    fs_note "could not load module ${FS_CUDA_MODULE}; using the env's bundled CUDA runtime"
+  fi
 fi
 
 fs_collect_versions

@@ -5,11 +5,15 @@ exports a **FoldStudio experiment bundle** the backend can import.
 
 > ## Read this first
 >
-> **Nothing in this directory has been run on the Mill.** It was written and
-> tested in a sandbox with no Slurm, no GPU and no access to `files.rcsb.org`
-> or `alphafold.ebi.ac.uk`. What *is* verified, and how, is in
-> [What has and has not run](#what-has-and-has-not-run). Please read that section
-> before you trust any of it.
+> **Part of this has now run on the Mill; most of it still has not.** One real
+> run exists (`20261114T115930Z`): discovery, both environment builds, the
+> RFdiffusion stage and the ProteinMPNN stage all succeeded on a V100 node of
+> `requeue`. The prediction stage was started and **its outcome has never been
+> seen**; nothing has been exported from the cluster. Everything else was written
+> and tested in a sandbox with no Slurm, no GPU and no access to `files.rcsb.org`
+> or `alphafold.ebi.ac.uk`. Exactly what ran, and what is merely tested offline,
+> is in [What has and has not run](#what-has-and-has-not-run). Please read that
+> section before you trust any of it.
 >
 > The app does not need this pipeline. FoldStudio is fully useful with no GPU:
 > `POST /jobs` returns `501 {"detail":"no_runner"}` by design, and the
@@ -70,14 +74,18 @@ bash scripts/hpc_dry_run.sh           # tests + a demo bundle
 python scripts/hpc_check_contract.py  # does the bundle still import into Stream 1's API?
 ```
 
-## Which partition? The two briefs disagree
+## Which partition? Settled: `requeue`
 
 Stream 3's brief said **`requeue`** (free, max 1 day, preemptible). A later
 constraint note said student access is **`class`** only (max 4 hours, intended
-for coursework, acceptable use to be confirmed with ITRSS). Both can't be the
-operating assumption, and only discovery settles it.
+for coursework). Discovery on the cluster settled it: **there is no `class`
+partition on the Mill** — `sbatch` rejects it with "invalid partition" — and
+`requeue` is what we have. GPU jobs have since run there successfully, so this
+is observed rather than assumed.
 
-Rather than pick one, the pipeline is safe under either:
+The pipeline is nonetheless still safe under a short-wall-time partition, which
+is worth keeping: `requeue` preempts, so every stage has to survive a short life
+anyway.
 
 - `FS_TIME_GPU` defaults to **03:45:00**, which is valid on a 4-hour cap *and* on
   `requeue`. Every stage checkpoints, so short jobs cost only an extra `resume`.
@@ -295,11 +303,14 @@ as such everywhere in the UI.
 
 | what | how |
 |---|---|
-| `lib/common.sh` + `lib/ledger.py` | `bash hpc/tests/test_stage_lib.sh` — **36/36 pass**, including a real `SIGUSR1` preemption (partial work flushed to `$HOME`, exit 99, no false `stage_end`), a resume pass that redoes **zero** finished items, and a torn ledger line that is skipped rather than fatal |
-| `export_bundle.py` and its parsers | `python hpc/tests/test_export_bundle.py` — **52/52 pass** |
-| **the bundle actually imports** | `python scripts/hpc_check_contract.py` — **24/24 pass**: boots Stream 1's real FastAPI app over a temp data dir, reindexes the bundle, registers its structures, and confirms `/plddt` returns **409** for a backbone, `/pae` returns **404 pae_unavailable**, and `/jobs` returns **501 no_runner** |
+| `lib/common.sh` + `lib/ledger.py` | `bash hpc/tests/test_stage_lib.sh` — **61/61 pass**, including a real `SIGUSR1` preemption (partial work flushed to `$HOME`, exit 99, no false `stage_end`), a resume pass that redoes **zero** finished items, and a torn ledger line that is skipped rather than fatal |
+| `export_bundle.py` and its parsers | `python hpc/tests/test_export_bundle.py` — **83/83 pass** |
+| the OpenFold source patch | `python hpc/tests/test_openfold_patch.py` — **10/10 pass**, against fixtures copied verbatim from the pinned upstream commit |
+| the ESMFold env build | `bash hpc/tests/test_setup_pred_env.sh` — **45/45 checks pass**, driving `do_pred_env` against stand-in `conda`/`pip`/`git`/`gcc`/`nvcc`/`module` so the order and the flags are asserted without a GPU |
+| **the bundle actually imports** | `python scripts/hpc_check_contract.py` — **27/27 pass, 0 warnings**: boots Stream 1's real FastAPI app over a temp data dir, reindexes the bundle, registers its structures, and confirms `/plddt` returns **409** for a backbone, `/pae` returns **404 pae_unavailable**, and `/jobs` returns **501 no_runner** |
 | bundle ↔ backend compatibility | also validated directly against **Stream 1's real pydantic `Experiment` model** |
-| the wall-time guard | `fs_time_to_seconds` covers every `MaxTime` format `scontrol` prints; the guard was exercised against a simulated 4-hour `class` partition (8 h request rejected, 3:45 default accepted, no-GPU warning raised) |
+| the wall-time guard | `fs_time_to_seconds` covers every `MaxTime` format `scontrol` prints; the guard was exercised against a simulated 4-hour partition (8 h request rejected, 3:45 default accepted, no-GPU warning raised) — a cap that no real Mill partition turned out to have, but the guard is what proved that cheaply |
+| the GPU-type preflight | `run_pipeline.sh preflight` compares the GRES we ask for against the types the partition actually offers, and says so when the partition advertises none |
 | RMSD arithmetic | checked on real coordinates under known rigid transforms (rotation + translation → 0; alternating displacement → the right magnitude) |
 | the validator itself | 10 tests mutate a good bundle and confirm each violation is caught |
 | ProteinMPNN output parsing | against a **genuine ProteinMPNN output** committed upstream; parsed scores match its own headers (0.8221 / 0.8356 → mean 0.8289) |
@@ -312,46 +323,75 @@ and read rather than recalled: RFdiffusion's `env/SE3nv.yml`,
 `config/inference/base.yaml` and `scripts/download_models.sh`; ProteinMPNN's
 `protein_mpnn_run.py` argument list; the ESM README's ESMFold install block.
 
-### Never executed, anywhere
+### What has actually run on the Mill
 
-**These have never run. Their first execution will be yours.**
+One real run exists: **`20261114T115930Z`**, `FS_NUM_DESIGNS=1`, on a
+`V100-SXM2-32GB` node of `requeue`.
+
+| stage | on the Mill |
+|---|---|
+| `00_discover.sh` | ran; its findings are what fixed `FS_GPU_GRES`, the module names and the `class`-partition question above |
+| `10_setup_env.sh` | ran, for both environments. The ESMFold half needed real repairs, which are now **in the script** rather than in someone's shell history: torch from the `cu121` index, OpenFold built from a pinned commit with `-std=c++17` and `--no-build-isolation`, `deepspeed` uninstalled (it imports the removed `torch._six`), and `seed.py` patched to import `seed_everything` from `pytorch_lightning` |
+| `11_fetch_weights.sh` | ran for RFdiffusion. The ESMFold prefetch was skipped on purpose (`FS_SKIP_ESM_PREFETCH=1`); ColabFold params were never fetched |
+| `20_rfdiffusion.sbatch` | **exit 0**, ~70 s, one backbone |
+| `30_proteinmpnn.sbatch` | **exit 0**, ~4 s |
+| `40_predict.sbatch` (esmfold) | **started, outcome unverified.** It was still running when this session lost its view of the cluster. Nobody has seen it finish, and none of its output has been inspected |
+| `50_export.sbatch` | **never run there.** No bundle has been exported from the cluster |
+
+So the pipeline is no longer hypothetical through stage 30, and the prediction
+stage at least gets as far as loading a repaired ESMFold. Everything past that
+is still unproven.
+
+### Still never executed, anywhere
 
 | never run | most likely to need a fix |
 |---|---|
-| `10_setup_env.sh` (clone/env creation) | the conda solve for `SE3nv`; `nvcc` availability for `SE3Transformer` |
-| `11_fetch_weights.sh` (all downloads) | outbound access to `files.ipd.uw.edu`; login-node RAM for the ESMFold prefetch |
-| `20_rfdiffusion.sbatch` | hydra override names if your RFdiffusion differs from current `main`; the V100/H100 issue above |
-| `30_proteinmpnn.sbatch` | output path `<out>/seqs/<name>.fa` |
-| `40_predict.sbatch`, `predict_esmfold.py` | **the ESMFold output-dict key names** (`mean_plddt`, `ptm`, `predicted_aligned_error`). The runner prints the keys it actually got and writes null-with-reason rather than guessing, so this is normally a one-line fix |
-| `normalize_colabfold.py` | ColabFold's score-JSON keys; run it with `--list-only` first |
-| `50_export.sbatch` | paths only (`export_bundle.py` itself is well tested) |
-| the prediction half of the bundle | no pLDDT-bearing prediction is bundled with the repo, so `predicted_*` and `self_consistency_*` metrics have never been produced from a real prediction |
+| `predict_esmfold.py` **to completion** | **the ESMFold output-dict key names** (`mean_plddt`, `ptm`, `predicted_aligned_error`). The runner prints the keys it actually got and writes null-with-reason rather than guessing, so this is normally a one-line fix |
+| `normalize_colabfold.py`, and the whole `FS_PREDICTOR=colabfold` path | ColabFold's score-JSON keys; run it with `--list-only` first |
+| `50_export.sbatch` against a real ledger | paths only (`export_bundle.py` itself is well tested offline) |
+| `scripts/hpc_import_bundle.py` against a real bundle | it has only ever imported bundles made by `--dry-run` |
+| the prediction half of the bundle | no pLDDT-bearing prediction has been produced by this pipeline, so `predicted_*` and `self_consistency_*` metrics have never come from a real prediction of ours |
+| the off-cluster path (`OFFLOAD.md`) | documented from what the exporter actually reads, but never walked end to end |
 
-### The first things to run on the Mill, in order
+### Next time you are on the Mill, in order
+
+The repaired setup script is newer than the environment on the cluster, so pull
+first. Nothing below re-runs a finished stage.
 
 ```bash
-# 1. discovery -- cheap, read-only, answers "is there even a GPU on requeue?"
-bash hpc/00_discover.sh && sed -n '/## 5. Verdict/,$p' hpc/DISCOVERED.md
+# 1. get the fixes that came out of the last session
+cd ~/foldstudio && git pull
 
-# 2. offline self-check -- no cluster resources used
-bash scripts/hpc_dry_run.sh
-
-# 3. setup, then confirm it from its own report
-bash hpc/10_setup_env.sh    && bash hpc/10_setup_env.sh check
-bash hpc/11_fetch_weights.sh && bash hpc/11_fetch_weights.sh report
-
-# 4. ONE design end-to-end before committing to a full run
-FS_NUM_DESIGNS=1 FS_SEQS_PER_DESIGN=2 bash hpc/run_pipeline.sh submit
+# 2. where did run 20261114T115930Z actually get to?
 bash hpc/run_pipeline.sh status
 
-# 5. sanity-check the prediction stage's parsing before trusting its numbers
-python hpc/predict_esmfold.py --fasta ~/foldstudio-hpc/runs/<RUN>/seqs/design_0.fa \
-    --out-dir /tmp/p --list-only
-cat ~/foldstudio-hpc/runs/<RUN>/pred/*.pred.json | head -40   # check plddt_units + unavailable
+# 3. if the prediction finished: export it. `export` with no run id now
+#    defaults to the newest run and says which one it picked.
+bash hpc/run_pipeline.sh export
 
-# 6. then scale up
+# 3b. if it did not finish, resume -- finished stages are skipped
+bash hpc/run_pipeline.sh resume
+
+# 4. before trusting any prediction number, look at what the model really keyed
+cat ~/foldstudio-hpc/runs/20261114T115930Z/pred/*.pred.json | head -40
+#    plddt_units and any `unavailable` reasons are the things to read
+
+# 5. only then scale up
 FS_NUM_DESIGNS=8 FS_SEQS_PER_DESIGN=8 bash hpc/run_pipeline.sh submit
 ```
+
+Then copy the bundle back and import it on the laptop:
+
+```bash
+scp mill:/tmp/bundle_hpc_<RUN>.tar.gz /tmp/
+python3 scripts/hpc_import_bundle.py /tmp/bundle_hpc_<RUN>.tar.gz
+```
+
+On a cluster where none of this has run yet, start one step earlier:
+`bash hpc/00_discover.sh`, then `bash scripts/hpc_dry_run.sh`, then
+`bash hpc/10_setup_env.sh && bash hpc/10_setup_env.sh check`, then
+`bash hpc/11_fetch_weights.sh`, then a single-design
+`FS_NUM_DESIGNS=1 FS_SEQS_PER_DESIGN=2 bash hpc/run_pipeline.sh submit`.
 
 Exercise the prediction half of the bundle with a real predicted model you
 already have (Stream 4's `scripts/fetch_demo_data.py` downloads AlphaFold DB
@@ -369,28 +409,33 @@ and would otherwise be reported as confidence.
 
 ## Known gaps and risks
 
-1. **The off-cluster path is documented but unexercised.** `OFFLOAD.md` describes
+1. **No prediction has ever been seen to finish, so no bundle has ever carried a
+   real pLDDT.** The prediction stage ran on the Mill but its result was never
+   observed, and `50_export.sbatch` has never run there. Until a bundle comes off
+   the cluster and imports cleanly, treat the `predicted_*` and
+   `self_consistency_*` half of the contract as tested-but-unproven.
+2. **The off-cluster path is documented but unexercised.** `OFFLOAD.md` describes
    the exact file and ledger contract, derived from what `export_bundle.py`
    actually reads (which is tested), but nobody has run RFdiffusion on Colab and
    walked a bundle through it. There is no notebook yet — deliberately, until
    discovery says whether one is needed.
-2. **Apptainer is configured but not wired through.** `fs_activate_env` validates
+3. **Apptainer is configured but not wired through.** `fs_activate_env` validates
    the image, but the stage scripts call `python` directly rather than
    `apptainer exec`. Use conda, or add the wrapper, before relying on
    `FS_ENV_MODE=apptainer`.
-3. **ColabFold is the less-tested predictor.** `normalize_colabfold.py` has never
+4. **ColabFold is the less-tested predictor.** `normalize_colabfold.py` has never
    seen real ColabFold output. ESMFold is the primary path; if ESMFold's OpenFold
    build defeats you, run `normalize_colabfold.py --list-only` first.
-4. **`FS_NUM_DESIGNS` is not enforced as a completion condition.** Stage 20 exits
+5. **`FS_NUM_DESIGNS` is not enforced as a completion condition.** Stage 20 exits
    0 when it produced *at least one* backbone, leaving `resume` to finish the
    rest. That is intentional on a preemptible partition, but it means "stage 20
    succeeded" does not mean "all designs exist" — check `status`.
-5. **`inference.write_trajectory=False`** keeps the 50 GB home quota safe but
+6. **`inference.write_trajectory=False`** keeps the 50 GB home quota safe but
    discards the diffusion trajectories. Flip it in `FS_RFD_EXTRA_ARGS` if you
    want them.
-6. **No TM-score.** The bundle reports CA RMSD only. `POST /api/analysis/align`
+7. **No TM-score.** The bundle reports CA RMSD only. `POST /api/analysis/align`
    (Stream 1) is the place to get TM-score between registered structures.
-7. **Multi-chain is unhandled.** Everything assumes a single chain `A`, which is
+8. **Multi-chain is unhandled.** Everything assumes a single chain `A`, which is
    what an unconditional monomer design produces.
 
 ## Configuration

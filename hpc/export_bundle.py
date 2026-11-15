@@ -437,8 +437,6 @@ def build(args) -> tuple[Bundle, dict, dict]:
 
     stages = run["stages"]
     rfd = stages.get("rfdiffusion", {})
-    mpnn = stages.get("proteinmpnn", {})
-    pred_stage = next((v for k, v in stages.items() if k.startswith("predict_")), {})
 
     # ---------------------------------------------------------------- backbones
     b.set_metric("n_backbones", len(run["backbones"]),
@@ -796,13 +794,24 @@ def build(args) -> tuple[Bundle, dict, dict]:
                  else "no Slurm job id was recorded, so at least one stage ran outside a "
                       "Slurm batch job")
         site = os.environ.get("FS_SITE", "").strip()
-        notes_parts.append(
-            "Executed by the FoldStudio Stream 3 pipeline"
-            + (f" at {site}" if site else "")
-            + f" (hosts: {', '.join(host_list) or 'not recorded'}; {where}). Stages: "
-            + "; ".join(f"{k}={'ran' if v.get('ran') else 'did not run'}"
-                        f"{' preempted x' + str(v['preemptions']) if v.get('preemptions') else ''}"
-                        f" exit={v.get('exit_status')}" for k, v in stages.items()))
+        science = {k: v for k, v in stages.items() if is_science_stage(k)}
+        if any(v.get("ran") for v in science.values()):
+            notes_parts.append(
+                "Executed by the FoldStudio Stream 3 pipeline"
+                + (f" at {site}" if site else "")
+                + f" (hosts: {', '.join(host_list) or 'not recorded'}; {where}). Stages: "
+                + "; ".join(f"{k}={'ran' if v.get('ran') else 'did not run'}"
+                            f"{' preempted x' + str(v['preemptions']) if v.get('preemptions') else ''}"
+                            f" exit={v.get('exit_status')}" for k, v in stages.items()))
+        else:
+            # Nothing ran, so the note must not open with "Executed by".
+            notes_parts.append(
+                "Exported by the FoldStudio Stream 3 pipeline from a run in which no design stage ran"
+                + (f" at {site}" if site else "")
+                + (". Stages recorded in the ledger: "
+                   + "; ".join(f"{k}=did not run exit={v.get('exit_status')}" for k, v in stages.items())
+                   if stages else ". The ledger recorded no stage at all")
+                + ".")
         notes_parts.append(
             "Backbones are registered as source 'uploaded', not 'predicted': a designed backbone "
             "carries no pLDDT, and its B-factor column must not be read as confidence.")

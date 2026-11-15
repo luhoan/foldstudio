@@ -211,7 +211,8 @@ fi
 # ------------------------------- 7. Slurm wall-time parsing (guards the preflight)
 # fs_check_walltime refuses to submit a job the partition will never schedule, so
 # this parser has to handle every format scontrol prints for MaxTime.
-#   4:00:00 is the `class` cap, 1-00:00:00 the `requeue` cap.
+#   1-00:00:00 is the real `requeue` cap; 4:00:00 is a short-partition cap we
+#   keep in the table because `requeue` preempts and short lives must still work.
 if ( . "${REPO}/hpc/env.sh"; . "${REPO}/hpc/lib/common.sh"
      set -e
      [ "$(fs_time_to_seconds '4:00:00')"    = "14400" ]
@@ -257,7 +258,8 @@ if out="$(PATH="${MKLDIR}/bin:$PATH" bash -c '
       set -euo pipefail
       FS_ENV_MODE=conda; FS_CONDA_ENV=SE3nv
       fs_die() { echo "DIED: $*" >&2; exit 1; }
-      source <(sed -n "/^fs_activate_env/,/^}/p" "'"${REPO}"'/hpc/lib/common.sh")
+      fs_log() { :; }
+      source <(sed -n "/^fs_have_module_cmd/,/^}/p; /^fs_module_load/,/^}/p; /^fs_ensure_conda/,/^}/p; /^fs_activate_env/,/^}/p" "'"${REPO}"'/hpc/lib/common.sh")
       fs_activate_env SE3nv
       case "$-" in *u*) echo RESTORED ;; *) echo LOST ;; esac' 2>&1)"; then
   check "conda activate survives set -u and restores nounset" "$out" "RESTORED"
@@ -282,9 +284,9 @@ chmod +x "${SBDIR}/sbatch"
 sb_out="$(PATH="${SBDIR}:$PATH" FS_SKIP_PREFLIGHT=1 FS_HOME_BASE="${SBDIR}/home" \
           bash "${REPO}/hpc/run_pipeline.sh" submit 2>&1 || true)"
 check "sbatch banner lines do not become the job id" \
-      "$(printf '%s\n' "${sb_out}" | grep -c 'as job 2746971\b')" "4"
+      "$(printf '%s\n' "${sb_out}" | grep -cE 'as job 2746971( |$)')" "4"
 check "every stage after the first chains on a bare job id" \
-      "$(printf '%s\n' "${sb_out}" | grep -c '(after 2746971)$')" "3"
+      "$(printf '%s\n' "${sb_out}" | grep -cE '\(after 2746971\)$')" "3"
 rm -rf "${SBDIR}"
 
 # ------------------------------------------------------- 7c'. resume parses ids too
@@ -303,8 +305,42 @@ rs_out="$(PATH="${RSDIR}/bin:$PATH" FS_SKIP_PREFLIGHT=1 FS_NUM_DESIGNS=1 FS_HOME
 check "resume resubmits only the unfinished stages (predict + export)" \
       "$(printf '%s\n' "${rs_out}" | grep -c '^resubmitted ')" "2"
 check "resume chains on a bare job id" \
-      "$(printf '%s\n' "${rs_out}" | grep -c 'as job 2750001 (after 2750001)$')" "1"
+      "$(printf '%s\n' "${rs_out}" | grep -cE 'as job 2750001 \(after 2750001\)$')" "1"
+# With no run id, resume takes the newest run instead of refusing.
+rs_out="$(PATH="${RSDIR}/bin:$PATH" FS_SKIP_PREFLIGHT=1 FS_NUM_DESIGNS=1 FS_HOME_BASE="${RSDIR}/home" \
+          bash "${REPO}/hpc/run_pipeline.sh" resume 2>&1 || true)"
+check "resume with no run id uses the newest run" \
+      "$(printf '%s\n' "${rs_out}" | grep -c '^run_id 20261114T115930Z:')" "1"
 rm -rf "${RSDIR}"
+
+# ------------------------------------------------------- 7c''. export finds the run
+# `export` used to insist on a run id. The id is a timestamp nobody remembers, so
+# with none given it takes the newest run and says which one it took.
+EXDIR="$(mktemp -d)"
+mkdir -p "${EXDIR}/home/runs/20261113T090000Z" "${EXDIR}/home/runs/20261114T115930Z/provenance" "${EXDIR}/data"
+ex_out="$(FS_HOME_BASE="${EXDIR}/home" FS_EXPORT_DATA_DIR="${EXDIR}/data" \
+          bash "${REPO}/hpc/run_pipeline.sh" export 2>&1 || true)"
+check "export with no run id says which run it took" \
+      "$(printf '%s\n' "${ex_out}" | grep -c 'using the newest run, 20261114T115930Z')" "1"
+if [ -f "${EXDIR}/data/experiments/hpc_20261114T115930Z/experiment.json" ]; then
+  ok "and exports that run under its own id"
+else
+  bad "export with no run id wrote no bundle for the newest run: ${ex_out}"
+fi
+ex_out="$(FS_HOME_BASE="${EXDIR}/home" FS_EXPORT_DATA_DIR="${EXDIR}/data" \
+          bash "${REPO}/hpc/run_pipeline.sh" export --experiment-id hpc_named 2>&1 || true)"
+if [ -f "${EXDIR}/data/experiments/hpc_named/experiment.json" ]; then
+  ok "an option in place of the run id is passed through, not taken for a run id"
+else
+  bad "export --experiment-id with no run id failed: ${ex_out}"
+fi
+ex_out="$(FS_HOME_BASE="${EXDIR}/empty" bash "${REPO}/hpc/run_pipeline.sh" export 2>&1 || true)"
+check "export with no runs at all says so" \
+      "$(printf '%s\n' "${ex_out}" | grep -c 'no runs found')" "1"
+# A bundle exported from a run with no stages must not claim anything ran.
+check "an empty run exports as failed, never as executed-and-ok" \
+      "$(python3 -c 'import json,sys; e=json.load(open(sys.argv[1])); print(e["status"])' "${EXDIR}/data/experiments/hpc_20261114T115930Z/experiment.json")" "failed"
+rm -rf "${EXDIR}"
 
 # ------------------------------------------------------- 7d. status finds the live run
 # `status` with no run id used to mint a fresh UTC timestamp, so running it
@@ -340,6 +376,58 @@ lv_out="$(PATH="${LVDIR}/bin:$PATH" FS_HOME_BASE="${LVDIR}" bash "${REPO}/hpc/ru
 check "the same ledger with no live job still reports the missing stage_end" \
       "$(printf '%s\n' "${lv_out}" | grep -c 'no stage_end')" "1"
 rm -rf "${LVDIR}"
+
+# ------------------------------------------------------- 7f. GPU type preflight
+# The V100 type is pinned by default because RFdiffusion's environment cannot run
+# on an H100. Preflight must say so when the partition does not offer that type,
+# and when the request names no type at all.
+PFDIR="$(mktemp -d)"
+mkdir -p "${PFDIR}/bin"
+{ printf '#!/usr/bin/env bash\n'
+  printf 'echo "PartitionName=requeue MaxTime=1-00:00:00 State=UP"\n'; } >"${PFDIR}/bin/scontrol"
+{ printf '#!/usr/bin/env bash\n'
+  printf 'echo "${FAKE_GRES:-gpu:V100-SXM2-32GB:4(S:0-1)}"\n'; } >"${PFDIR}/bin/sinfo"
+chmod +x "${PFDIR}/bin/scontrol" "${PFDIR}/bin/sinfo"
+pf_out="$(PATH="${PFDIR}/bin:$PATH" FS_HOME_BASE="${PFDIR}/home" bash "${REPO}/hpc/run_pipeline.sh" preflight 2>&1 || true)"
+check "the default GPU type is found on a partition that offers it" \
+      "$(printf '%s\n' "${pf_out}" | grep -c 'GPU type: V100-SXM2-32GB is offered')" "1"
+check "and the 1-day cap is read as 1440 minutes" \
+      "$(printf '%s\n' "${pf_out}" | grep -c 'MaxTime : 1440 min')" "1"
+pf_out="$(PATH="${PFDIR}/bin:$PATH" FAKE_GRES='gpu:H100:8' FS_HOME_BASE="${PFDIR}/home" bash "${REPO}/hpc/run_pipeline.sh" preflight 2>&1 || true)"
+check "a partition without that GPU type draws a warning that names both" \
+      "$(printf '%s\n' "${pf_out}" | grep -c "asks for GPU type 'V100-SXM2-32GB'")" "1"
+pf_out="$(PATH="${PFDIR}/bin:$PATH" FS_GPU_GRES=gpu:1 FS_HOME_BASE="${PFDIR}/home" bash "${REPO}/hpc/run_pipeline.sh" preflight 2>&1 || true)"
+check "an untyped request is flagged, because it can land on an H100" \
+      "$(printf '%s\n' "${pf_out}" | grep -c 'names no GPU type')" "1"
+rm -rf "${PFDIR}"
+
+# ------------------------------------------------------- 7g. python older than 3.7
+# Mill 2026-11-14: /usr/bin/python3 is 3.6 and the ledger died on its first import
+# ("future feature annotations is not defined"). env.sh must find a newer
+# interpreter by itself and put it first on PATH, for this process only.
+PYDIR="$(mktemp -d)"
+mkdir -p "${PYDIR}/old" "${PYDIR}/new" "${PYDIR}/home"
+printf '#!/bin/sh\nexit 1\n' >"${PYDIR}/old/python3"; chmod +x "${PYDIR}/old/python3"
+ln -s "$(command -v python3)" "${PYDIR}/new/python3.11"
+py_out="$(env -i HOME="${PYDIR}/home" PATH="${PYDIR}/old:${PYDIR}/new:/usr/bin:/bin" \
+          bash -c ". '${REPO}/hpc/env.sh'; command -v python3; python3 -c 'print(\"usable\")'" 2>&1 || true)"
+check "an old python3 is replaced by a shim to a newer interpreter" \
+      "$(printf '%s\n' "${py_out}" | head -1)" "${PYDIR}/home/foldstudio-hpc/shims/python3"
+check "and the shimmed python3 runs" "$(printf '%s\n' "${py_out}" | tail -1)" "usable"
+py_out="$(env -i HOME="${PYDIR}/home2" PATH="${PATH}" bash -c ". '${REPO}/hpc/env.sh'; command -v python3" 2>&1 || true)"
+if [ ! -d "${PYDIR}/home2/foldstudio-hpc/shims" ]; then ok "a python3 that is new enough is left alone"; else bad "a shim was created although python3 was fine"; fi
+py_out="$(env -i HOME="${PYDIR}/home3" PATH="${PYDIR}/old:/usr/bin:/bin" FS_PYTHON="$(command -v python3)" \
+          bash -c ". '${REPO}/hpc/env.sh'; python3 -c 'print(\"chosen\")'" 2>&1 || true)"
+check "FS_PYTHON chooses the interpreter" "$(printf '%s\n' "${py_out}" | tail -1)" "chosen"
+rm -rf "${PYDIR}"
+
+# ------------------------------------------------------- 7h. timestamps without %N
+# BSD date on older macOS prints a literal "N" for %N; fs_now must still return a number.
+NOWDIR="$(mktemp -d)"
+printf '#!/bin/sh\necho "1731600000.N"\n' >"${NOWDIR}/date"; chmod +x "${NOWDIR}/date"
+now_out="$(PATH="${NOWDIR}:$PATH" bash -c "source <(sed -n '/^fs_now()/,/^}/p' '${REPO}/hpc/lib/common.sh'); fs_now" 2>&1 || true)"
+if python3 -c 'import sys; float(sys.argv[1])' "${now_out}" 2>/dev/null; then ok "fs_now returns a number where date has no %N"; else bad "fs_now returned '${now_out}'"; fi
+rm -rf "${NOWDIR}"
 
 # ------------------------------------------------------- 8. torn ledger line survives
 printf '{"event":"stage_start","stage":"tr' >>"$LEDGER"

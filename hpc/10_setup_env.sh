@@ -15,7 +15,14 @@
 #
 # Everything is idempotent: finished steps are skipped on re-run.
 #
-# NOT YET EXECUTED ON THE MILL -- see "What has and has not run" in hpc/README.md.
+# WHAT HAS RUN ON THE MILL (2026-11-14), so you know what to trust:
+#   clone, rfd-env   ran as written here, and RFdiffusion then produced a backbone.
+#   pred-env         the first version of this step did NOT work. The ESMFold
+#                    environment was finished by hand; every one of those hand
+#                    fixes is now in do_pred_env below, each with the error that
+#                    made it necessary. That rewritten step has not itself been
+#                    run on the Mill. On an account where ESMFold already imports
+#                    it detects that and changes nothing.
 #
 # Versions pinned by upstream (verified against the real upstream files):
 #   RFdiffusion env/SE3nv.yml -> python=3.9, pytorch=1.9, cudatoolkit=11.1, dgl-cuda11.1
@@ -57,10 +64,10 @@ do_check() {
   printf '%-34s %s\n' "ProteinMPNN weights (in-repo)" "$([ -f "${FS_PROTEINMPNN_DIR}/vanilla_model_weights/${FS_MPNN_MODEL}.pt" ] && echo PRESENT || echo MISSING)"
   printf '%-34s %s\n' "torch hub cache" "${FS_TORCH_HOME}$([ -d "${FS_TORCH_HOME}" ] && echo " (present)" || echo " (missing)")"
   echo
-  if command -v conda >/dev/null 2>&1; then
+  if fs_ensure_conda; then
     echo "conda envs:"; conda env list | sed 's/^/  /'
   else
-    echo "conda: NOT on PATH (try: module avail conda, then module load <name>)"
+    echo "conda: NOT on PATH, and module '${FS_CONDA_MODULE:-<unset>}' did not load (try: module avail conda)"
   fi
   echo
   printf 'free space in $HOME: '; df -h "${HOME}" | awk 'NR==2{print $4" available of "$2}'
@@ -92,7 +99,8 @@ do_clone() {
 # ---------------------------------------------------------------- RFdiffusion env
 do_rfd_env() {
   fs_stage_begin setup_rfd_env
-  command -v conda >/dev/null 2>&1 || fs_die "conda not on PATH; run 'module avail conda' and load it, or set FS_ENV_MODE=apptainer"
+  fs_ensure_conda || fs_die "conda is not on PATH and module '${FS_CONDA_MODULE:-<unset>}' could not be loaded.
+Run 'module avail conda', then set FS_CONDA_MODULE=<name> in hpc/env.local.sh (on the Mill: miniconda/miniconda3)."
   [ -f "${FS_RFDIFFUSION_DIR}/env/SE3nv.yml" ] || fs_die "missing ${FS_RFDIFFUSION_DIR}/env/SE3nv.yml -- run '$0 clone' first"
 
   if conda env list | awk '{print $1}' | grep -qx "${FS_RFD_ENV}"; then
@@ -143,9 +151,35 @@ do_rfd_env() {
 }
 
 # ------------------------------------------------------------------ predictor env
+# True when the ESMFold code path stage 40 uses can be imported in the active env.
+# Importing esm alone proves nothing: OpenFold is only pulled in by this module.
+esmfold_imports() {
+  python -c 'import esm.esmfold.v1.esmfold' >/dev/null 2>&1
+}
+
+# Repairs that are cheap, idempotent and needed whether the env was just built or
+# was built earlier by hand. Each is here because of an error seen on the Mill.
+esmfold_repairs() {
+  # fair-esm[esmfold] installs deepspeed 0.5.9. OpenFold imports deepspeed when it
+  # is installed, and that release does `from torch._six import inf`, which
+  # current torch no longer has:  ModuleNotFoundError: No module named 'torch._six'.
+  # OpenFold only uses deepspeed for training, so removing it loses nothing here.
+  if python -c 'import importlib.util, sys; sys.exit(0 if importlib.util.find_spec("deepspeed") else 1)' 2>/dev/null; then
+    fs_run pip_uninstall_deepspeed pip uninstall -y deepspeed \
+      || fs_log "WARNING: could not uninstall deepspeed; 'import openfold' may fail with torch._six"
+  fi
+  # ImportError: cannot import name 'seed_everything' from pytorch_lightning.utilities.seed
+  local of_pkg
+  of_pkg="$(python -c 'import importlib.util as u; s = u.find_spec("openfold"); print(s.submodule_search_locations[0] if s and s.submodule_search_locations else "")' 2>/dev/null || true)"
+  if [ -n "${of_pkg}" ]; then
+    fs_run patch_openfold_installed python "${HERE}/patch_openfold.py" installed "${of_pkg}" \
+      || fs_log "WARNING: could not patch ${of_pkg}/utils/seed.py; read the log"
+  fi
+}
+
 do_pred_env() {
   fs_stage_begin setup_pred_env
-  command -v conda >/dev/null 2>&1 || fs_die "conda not on PATH"
+  fs_ensure_conda || fs_die "conda is not on PATH and module '${FS_CONDA_MODULE:-<unset>}' could not be loaded (try: module avail conda)"
 
   if conda env list | awk '{print $1}' | grep -qx "${FS_PRED_ENV}"; then
     fs_log "conda env '${FS_PRED_ENV}' already exists"
@@ -158,26 +192,88 @@ do_pred_env() {
 
   case "${FS_PREDICTOR}" in
     esmfold)
-      # Upstream ESMFold install, verified against facebookresearch/esm README.
-      # OpenFold needs nvcc: load the CUDA module BEFORE running this.
-      if ! command -v nvcc >/dev/null 2>&1; then
-        fs_log "WARNING: nvcc not on PATH. OpenFold will likely fail to build."
-        fs_log "         Try: module load ${FS_CUDA_MODULE}   (then re-run '$0 pred-env')"
+      # An environment that already works is left exactly as it is. This matters on
+      # the account where it was finished by hand: re-running setup must not
+      # reinstall anything into it.
+      if esmfold_imports; then
+        fs_log "ESMFold already imports in '${FS_PRED_ENV}'; nothing to build"
+        esmfold_repairs
+        fs_mark_done esmfold_env "conda env ${FS_PRED_ENV} (found working)"
+        fs_collect_versions
+        return 0
       fi
-      fs_run pip_torch pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu118 \
-        || fs_log "WARNING: pinned torch install failed; falling back to whatever fair-esm pulls"
+
+      # --- toolchain for OpenFold's CUDA kernel --------------------------------
+      # nvcc comes from the CUDA module.
+      if ! command -v nvcc >/dev/null 2>&1; then
+        fs_module_load "${FS_CUDA_MODULE}" && fs_log "loaded module ${FS_CUDA_MODULE} (provides nvcc)"
+      fi
+      command -v nvcc >/dev/null 2>&1 \
+        || fs_die "nvcc is not on PATH and module '${FS_CUDA_MODULE}' could not be loaded.
+OpenFold compiles a CUDA kernel and cannot be installed without it. Find the module
+with 'module avail cuda' and set FS_CUDA_MODULE in hpc/env.local.sh."
+      # The PyTorch headers need C++17. The system GCC on the Mill (8.5) is too old:
+      #   error: #error C++17 or later compatible compiler is required to use PyTorch.
+      fs_ensure_gcc 9 \
+        || fs_die "need GCC >= 9 to build OpenFold against current PyTorch headers, but found
+'$(gcc --version 2>/dev/null | head -1 || echo "no gcc")' and module '${FS_GCC_MODULE:-<unset>}' did not help.
+Find one with 'module avail gcc' and set FS_GCC_MODULE in hpc/env.local.sh."
+      # Without these the build picks up whichever compiler distutils remembers.
+      CC="$(command -v gcc)"; CXX="$(command -v g++)"
+      export CC CXX
+      fs_note "OpenFold toolchain: $(gcc --version | head -1); $(nvcc --version | tail -1); CC=${CC}"
+
+      # --- python packages --------------------------------------------------------
+      # cu121 wheels, to match cuda-toolkit/12.9. With the cu118 wheels nvcc 12.9
+      # and torch disagreed about the CUDA version and the kernel did not build.
+      fs_run pip_torch pip install --no-cache-dir torch --index-url "${FS_PRED_TORCH_INDEX}" \
+        || fs_die "could not install torch from ${FS_PRED_TORCH_INDEX}"
       fs_run pip_fair_esm pip install --no-cache-dir "fair-esm[esmfold]" \
         || fs_die "pip install fair-esm[esmfold] failed"
       fs_run pip_dllogger pip install --no-cache-dir 'dllogger @ git+https://github.com/NVIDIA/dllogger.git' \
         || fs_die "dllogger install failed"
-      # Pinned OpenFold commit, as documented by upstream ESM.
-      fs_run pip_openfold pip install --no-cache-dir \
-        'openfold @ git+https://github.com/aqlaboratory/openfold.git@4b41059694619831a7db195b7e0988fc4ff3a307' \
-        || fs_die "OpenFold install failed. This is the single most fragile step in the pipeline.
+
+      # --- OpenFold, from a patched local clone -------------------------------------
+      # `pip install openfold @ git+...` cannot work: the source must be patched
+      # before it compiles (see hpc/patch_openfold.py for the three reasons), and
+      # pip's isolated build environment has no torch for its setup.py to import.
+      if python -c 'import openfold' >/dev/null 2>&1; then
+        fs_log "openfold already importable; not rebuilding"
+      else
+        if [ ! -d "${FS_OPENFOLD_DIR}/.git" ]; then
+          mkdir -p "$(dirname "${FS_OPENFOLD_DIR}")"
+          fs_run clone_openfold git clone https://github.com/aqlaboratory/openfold.git "${FS_OPENFOLD_DIR}" \
+            || fs_die "could not clone OpenFold (no outbound network from this node?)"
+        fi
+        if [ "$(git -C "${FS_OPENFOLD_DIR}" rev-parse HEAD 2>/dev/null)" != "${FS_OPENFOLD_COMMIT}" ]; then
+          # Local edits from an earlier patch would block the checkout; they are re-applied below.
+          fs_run openfold_checkout git -C "${FS_OPENFOLD_DIR}" checkout --quiet --force "${FS_OPENFOLD_COMMIT}" \
+            || fs_die "could not check out OpenFold ${FS_OPENFOLD_COMMIT}"
+        fi
+        fs_run patch_openfold_source python "${HERE}/patch_openfold.py" source "${FS_OPENFOLD_DIR}" \
+          || fs_die "OpenFold's source is not what hpc/patch_openfold.py expects; see the log"
+        # FS_OPENFOLD_CC is read by the patched setup.py: build for the GPUs the jobs
+        # use (V100 = 70), whether or not this node has a GPU of its own.
+        export FS_OPENFOLD_CC
+        fs_run pip_openfold pip install --no-cache-dir --no-build-isolation "${FS_OPENFOLD_DIR}" \
+          || fs_die "OpenFold did not build. The compiler output is in the log named above.
+What it needs, all checked earlier in this step: nvcc (${FS_CUDA_MODULE}), GCC >= 9
+(${FS_GCC_MODULE}), and torch from ${FS_PRED_TORCH_INDEX}.
 If it keeps failing, switch predictors instead of fighting it:
     FS_PREDICTOR=colabfold bash $0 pred-env"
-      fs_run esm_import_check python -c 'import esm; print("fair-esm OK", esm.__version__ if hasattr(esm,"__version__") else "")' \
-        || fs_log "WARNING: esm did not import cleanly"
+      fi
+
+      esmfold_repairs
+
+      if esmfold_imports; then
+        fs_log "ESMFold imports cleanly in '${FS_PRED_ENV}'"
+        fs_mark_done esmfold_env "conda env ${FS_PRED_ENV}"
+      else
+        # Show the real traceback rather than a summary of it.
+        fs_run esmfold_import_check python -c 'import esm.esmfold.v1.esmfold' || true
+        fs_die "the environment was built but 'import esm.esmfold.v1.esmfold' fails; the traceback is above.
+Stage 40 cannot run until that import works."
+      fi
       ;;
     colabfold)
       # Usually the more reliable install of the two, and it writes PAE JSON

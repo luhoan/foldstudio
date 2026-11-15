@@ -23,9 +23,12 @@ Two things this script refuses to do:
    key is absent, the value is written as null with a reason, and the script
    prints the keys the model did return so the mismatch takes a minute to fix.
 
-NOT YET EXECUTED: no one has run this against a real ESMFold install. The ESM
-output-dict key names are the most likely thing to need a one-line correction on
-first run; see "What has and has not run" in hpc/README.md.
+PARTLY EXECUTED: this has been launched once against a real ESMFold install on
+the Mill (run 20261114T115930Z) after the OpenFold build was repaired, but the
+job was still running when the session lost its view of the cluster, so NO ONE
+HAS SEEN IT FINISH and no output of it has been inspected. The ESM output-dict
+key names are still the most likely thing to need a one-line correction; see
+"What has and has not run" in hpc/README.md.
 
 pLDDT and PAE are the model's own confidence estimates. They are not evidence of
 folding, binding, affinity, efficacy or safety.

@@ -1,11 +1,28 @@
 # DISCOVERED.md -- Mill cluster capability report
 
-**Status: NOT COLLECTED YET. This is a placeholder, not a report.**
+**Status: STILL A PLACEHOLDER. The real report has never been committed.**
 
-No one has run `hpc/00_discover.sh` on the Mill. Nothing in this file is measured,
-and no claim about Mill partitions, GPUs, modules or quotas should be taken from it.
-The numbers below are *targets to verify*, taken from the Mill documentation and from
-the Stream 3 brief -- not observations.
+`hpc/00_discover.sh` *has* been run on the Mill, but its output was read on the
+cluster and never copied back into this file, so **the body of this document is
+still unmeasured**. Do not take any partition, GPU, module or quota number below
+as an observation; they are targets to verify, from the Mill documentation and the
+Stream 3 brief.
+
+Four things from that session are observations, and they are already encoded in
+`hpc/env.sh` rather than here:
+
+- there is **no `class` partition** (`sbatch` answers "invalid partition");
+  `requeue` is what student access actually gets.
+- `requeue` has GPU nodes, and the working GRES string is
+  **`gpu:V100-SXM2-32GB:1`**. RFdiffusion's `SE3nv` environment is PyTorch 1.9 /
+  CUDA 11.1 and has no `sm_90` kernels, so an H100 is not an option.
+- the modules that exist and load are **`miniconda/miniconda3`**,
+  **`gcc/12.2.0`** and **`cuda-toolkit/12.9`**.
+- the login node's `python3` is **3.6**, which is too old for our tooling;
+  `/usr/bin/python3.11` exists, and `hpc/env.sh` now shims it onto `PATH`.
+
+Re-running the script on the Mill overwrites this file with the real thing, which
+is still worth doing.
 
 ## How to fill this in
 

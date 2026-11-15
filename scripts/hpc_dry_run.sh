@@ -101,6 +101,25 @@ else
   FAILED=1
 fi
 
+echo "  environment patches (OpenFold, for the ESMFold environment)"
+if python3 "${REPO}/hpc/tests/test_openfold_patch.py" >/tmp/hpc_openfold_tests.log 2>&1; then
+  grep -E '^(Ran|OK)' /tmp/hpc_openfold_tests.log | sed 's/^/    /'
+else
+  echo "    FAILED -- failures and errors:"
+  grep -E '^(FAIL|ERROR|AssertionError)' /tmp/hpc_openfold_tests.log | sed 's/^/      /' || true
+  echo "    (full log: /tmp/hpc_openfold_tests.log)"
+  FAILED=1
+fi
+
+echo "  predictor environment setup, with stand-in tools (order of steps, not the real build)"
+if bash "${REPO}/hpc/tests/test_setup_pred_env.sh" >/tmp/hpc_pred_env_tests.log 2>&1; then
+  tail -1 /tmp/hpc_pred_env_tests.log | sed 's/^/    /'
+else
+  echo "    FAILED -- full output:"
+  sed 's/^/      /' /tmp/hpc_pred_env_tests.log
+  FAILED=1
+fi
+
 echo "  bundle import (scripts/hpc_import_bundle.py)"
 if python3 "${REPO}/hpc/tests/test_import_bundle.py" >/tmp/hpc_import_tests.log 2>&1; then
   grep -E '^(Ran|OK)' /tmp/hpc_import_tests.log | sed 's/^/    /'
@@ -153,10 +172,11 @@ if [ "${FAILED}" -eq 0 ]; then
   echo "RESULT: all offline checks passed."
   [ "${KEEP}" -eq 1 ] && echo "bundle kept at: ${DATA_DIR}/experiments/hpc_dryrun_check"
   echo
-  echo "This proves the bundle format, the parsers, the checkpoint/resume logic and"
-  echo "the preemption handling. It proves NOTHING about RFdiffusion, ProteinMPNN or"
-  echo "ESMFold running on the Mill -- none of that has been executed. See the"
-  echo "'What has and has not run' section of hpc/README.md."
+  echo "This checks the bundle format, the parsers, the checkpoint/resume logic, the"
+  echo "preemption handling and the order of the setup steps, all without a cluster."
+  echo "It says nothing about RFdiffusion, ProteinMPNN or ESMFold themselves: no model"
+  echo "runs here. What has actually run on the Mill, and what has not been observed,"
+  echo "is in the 'What has and has not run' section of hpc/README.md."
 else
   echo "RESULT: FAILURES ABOVE."
 fi

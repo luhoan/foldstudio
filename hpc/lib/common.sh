@@ -45,7 +45,16 @@ fs_event() {
 fs_note() { fs_event note --kv message="$*"; }
 
 # ------------------------------------------------------------------ timing util
-fs_now() { date -u +%s.%N; }
+# Seconds since the epoch, with a fractional part. BSD `date` on older macOS has
+# no %N and prints a literal "N", so fall back to python there.
+fs_now() {
+  local t
+  t="$(date -u +%s.%N 2>/dev/null || true)"
+  case "${t}" in
+    ""|*N) python3 -c 'import time; print("%.6f" % time.time())' ;;
+    *)     printf '%s\n' "${t}" ;;
+  esac
+}
 fs_elapsed() { python3 -c 'import sys;print(round(float(sys.argv[2])-float(sys.argv[1]),3))' "$1" "$(fs_now)"; }
 
 # ------------------------------------------------------------------ checkpoints
@@ -98,6 +107,66 @@ fs_on_preempt() {
   exit 99
 }
 
+# ---------------------------------------------------------------- modules
+# `module` is a shell function that login shells define. A script started with
+# `bash script.sh` usually inherits it, but not always, so look for the init
+# files Lmod and Environment Modules install before giving up.
+fs_have_module_cmd() {
+  command -v module >/dev/null 2>&1 && return 0
+  local f had_u=0
+  case "$-" in *u*) had_u=1; set +u ;; esac
+  for f in /etc/profile.d/lmod.sh /etc/profile.d/z00_lmod.sh /etc/profile.d/modules.sh \
+           /usr/share/lmod/lmod/init/bash /usr/share/Modules/init/bash; do
+    if [ -r "$f" ]; then
+      # shellcheck source=/dev/null
+      . "$f" >/dev/null 2>&1 || true
+      command -v module >/dev/null 2>&1 && break
+    fi
+  done
+  [ "${had_u}" = 1 ] && set -u
+  command -v module >/dev/null 2>&1
+}
+
+# fs_module_load <name> -- 0 if the module loaded. An empty name is "do not try".
+# Module scripts are not written for `set -u`, so nounset is relaxed around the call.
+fs_module_load() {
+  [ -n "${1:-}" ] || return 1
+  fs_have_module_cmd || return 1
+  local had_u=0 rc=0
+  case "$-" in *u*) had_u=1; set +u ;; esac
+  module load "$1" >/dev/null 2>&1 || rc=$?
+  [ "${had_u}" = 1 ] && set -u
+  return "${rc}"
+}
+
+# fs_ensure_conda -- make `conda` available, loading FS_CONDA_MODULE if need be.
+fs_ensure_conda() {
+  command -v conda >/dev/null 2>&1 && return 0
+  if fs_module_load "${FS_CONDA_MODULE:-}" && command -v conda >/dev/null 2>&1; then
+    fs_log "loaded module ${FS_CONDA_MODULE} (provides conda)"
+    return 0
+  fi
+  return 1
+}
+
+fs_gcc_major() { gcc -dumpversion 2>/dev/null | cut -d. -f1; }
+
+# fs_ensure_gcc <min-major> -- make a new enough `gcc` available, loading
+# FS_GCC_MODULE if the one on PATH is too old or missing.
+fs_ensure_gcc() {
+  local want="$1" have
+  have="$(fs_gcc_major)"
+  if [ -n "${have}" ] && [ "${have}" -ge "${want}" ] 2>/dev/null; then return 0; fi
+  if fs_module_load "${FS_GCC_MODULE:-}"; then
+    have="$(fs_gcc_major)"
+    if [ -n "${have}" ] && [ "${have}" -ge "${want}" ] 2>/dev/null; then
+      fs_log "loaded module ${FS_GCC_MODULE} (gcc ${have})"
+      return 0
+    fi
+  fi
+  return 1
+}
+
 # ---------------------------------------------------------------- env / versions
 # fs_activate_env [conda-env-name]  -- defaults to ${FS_CONDA_ENV}
 fs_activate_env() {
@@ -105,7 +174,7 @@ fs_activate_env() {
   case "${FS_ENV_MODE}" in
     conda)
       # `conda activate` needs the shell hook in a non-interactive shell.
-      if command -v conda >/dev/null 2>&1; then
+      if fs_ensure_conda; then
         # Conda's hook and an env's activate.d scripts (MKL's sets
         # MKL_INTERFACE_LAYER from an unset variable) are not written for
         # `set -u`, so relax nounset across activation only and restore it.
@@ -116,7 +185,9 @@ fs_activate_env() {
         conda activate "${want}" || { { [ "${_fs_had_u}" = 1 ] && set -u; }; fs_die "conda activate ${want} failed (run hpc/10_setup_env.sh first)"; }
         [ "${_fs_had_u}" = 1 ] && set -u || true
       else
-        fs_die "FS_ENV_MODE=conda but 'conda' is not on PATH (try: module load miniconda3, or set FS_ENV_MODE=venv)"
+        fs_die "FS_ENV_MODE=conda but 'conda' is not on PATH and module '${FS_CONDA_MODULE:-<unset>}' could not be loaded.
+Find the right name with 'module avail conda' (on the Mill it is miniconda/miniconda3), then either
+'module load <name>' before running this, or set FS_CONDA_MODULE=<name> in hpc/env.local.sh."
       fi
       ;;
     venv)
@@ -393,7 +464,8 @@ fs_require_gpu() {
 # The ledger needs python >= 3.7 (PEP 563 annotations). Alma 8's /usr/bin/python3
 # can be 3.6, so check loudly rather than failing with a confusing SyntaxError.
 fs_require_python() {
-  python3 - <<'PY' || fs_die "python3 is older than 3.7; run 'module load python' (or activate the conda env) before this script"
+  python3 - <<'PY' || fs_die "python3 is older than 3.7 and hpc/env.sh found no newer interpreter to use instead.
+Point it at one: add  FS_PYTHON=/path/to/python3.x  to hpc/env.local.sh (on the Mill, /usr/bin/python3.11 exists)."
 import sys
 raise SystemExit(0 if sys.version_info >= (3, 7) else 1)
 PY
