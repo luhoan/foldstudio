@@ -4,6 +4,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { ApiStatus } from './ApiStatus'
+import { BrandMark } from './BrandMark'
 import { NAV_ITEMS } from './nav'
 import { PanelSlot } from './PanelSlot'
 
@@ -34,6 +35,7 @@ export function AppShell() {
     <div className="flex h-full bg-background text-foreground">
       <nav aria-label="Primary" className="flex w-60 shrink-0 flex-col border-r border-border bg-sidebar">
         <div className="flex h-14 items-center gap-2.5 px-4">
+          <BrandMark className="size-7 text-primary" />
           <span className="fs-wordmark">FoldStudio</span>
         </div>
         <ul className="flex-1 space-y-0.5 overflow-auto px-2 py-2">

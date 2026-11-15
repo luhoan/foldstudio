@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./typography.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -10,8 +11,8 @@
  * the AlphaFold confidence scale are reserved for confidence data and are never used as decoration,
  * so a colour on screen always means the same thing.
  *
- * Type is set in system fonts: each font-family below names its own stack, and reads an
- * optional --fs-font-* variable first so a typeface can be supplied without touching this file.
+ * Typefaces live in typography.css. Without it everything here still works, in system fonts:
+ * each font-family below names its own fallback.
  */
 
 :root {

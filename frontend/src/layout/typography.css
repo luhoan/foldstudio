@@ -1,0 +1,48 @@
+/*
+ * Typefaces. This file is the whole of the app's typography: delete the @import of it in
+ * theme.css (and src/assets/fonts/) and the app falls back to system fonts, nothing else changes.
+ *
+ * STIX Two Text, the face scientific journals are set in, for page titles and the wordmark.
+ * IBM Plex Sans for the interface, IBM Plex Mono for sequences, identifiers and paths.
+ * The files are bundled so the app looks the same offline; sources and licences are in
+ * src/assets/fonts/README.md.
+ */
+
+@font-face {
+  font-family: "STIX Two Text";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url("../assets/fonts/stix-two-text-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 700;
+  src: url("../assets/fonts/ibm-plex-sans-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("../assets/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url("../assets/fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2");
+}
+
+:root {
+  --fs-font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fs-font-title: "STIX Two Text", "Iowan Old Style", "Charter", Georgia, serif;
+  --fs-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
