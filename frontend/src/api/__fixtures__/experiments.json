@@ -34,6 +34,26 @@
       "structures/design_0_s1.pdb",
       "structures/design_0_s1.pae.json"
     ],
+    "per_design": [
+      {
+        "file": "structures/design_0_s1.pdb",
+        "mean_plddt": 64.33,
+        "mean_plddt_source": "mean CA B-factor of the predicted PDB (pLDDT, 0-100)",
+        "n_residues": 12,
+        "name": "design_0_s1",
+        "pae_file": "structures/design_0_s1.pae.json",
+        "role": "design",
+        "scrmsd": {
+          "aligned_atoms": 12,
+          "aligned_residues": 12,
+          "atom_type": "CA",
+          "backbone": "design_0.pdb",
+          "method": "optimal superposition, Kabsch algorithm (numpy SVD)",
+          "reason": null,
+          "rmsd": 0.0
+        }
+      }
+    ],
     "provenance": {
       "notes": "Synthetic fixture for frontend tests. Not a real structure, model or run.",
       "retrieved_at": "2026-01-01T00:00:00Z",
@@ -58,7 +78,7 @@
       {
         "error": null,
         "ledger_stage": null,
-        "note": "No input structure: this is de novo design, so the backbone is generated rather than supplied.",
+        "note": "No input structure: this is de novo design, so the backbone is generated rather than supplied. Nothing is missing.",
         "outputs": 0,
         "preemptions": 0,
         "stage": "Structure",
@@ -101,19 +121,19 @@
       },
       {
         "error": null,
-        "ledger_stage": "export_bundle",
-        "note": "Some metrics were measured and one was not.",
-        "outputs": 0,
+        "ledger_stage": null,
+        "note": "Computed from the bundled files: mpnn_best_score, predicted_best_mean_plddt, self_consistency_ca_rmsd_best.",
+        "outputs": 3,
         "preemptions": 0,
         "stage": "Evaluation",
-        "status": "partial",
-        "status_label": "partial",
+        "status": "executed",
+        "status_label": "executed",
         "wall_seconds": null
       },
       {
         "error": null,
         "ledger_stage": null,
-        "note": "Review happens in the app, not in the pipeline.",
+        "note": "Performed by a person in FoldStudio; the pipeline does not review its own candidates.",
         "outputs": 0,
         "preemptions": 0,
         "stage": "Candidate review",

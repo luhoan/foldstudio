@@ -53,7 +53,8 @@ def to_matrix4(R, t):
     M = np.eye(4)
     M[:3, :3] = R
     M[:3, 3] = t
-    return [[round(float(v), 6) for v in row] for row in M]
+    # "+ 0.0" turns a rounded negative zero into plain zero, so the JSON never says "-0.0".
+    return [[round(float(v), 6) + 0.0 for v in row] for row in M]
 
 
 # ------------------------------------------------------------------ TM-score

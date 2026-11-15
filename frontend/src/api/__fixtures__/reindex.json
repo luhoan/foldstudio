@@ -1,0 +1,12 @@
+{
+  "at": "2026-01-01T00:00:00Z",
+  "errors": [],
+  "imported": [
+    "hpc_fixture_run",
+    "imported-fixture-complex",
+    "imported-fixture-predicted"
+  ],
+  "removed": [],
+  "structures_registered": [],
+  "structures_updated": []
+}

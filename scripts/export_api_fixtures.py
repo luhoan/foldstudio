@@ -162,7 +162,8 @@ def build_data_dir(data: Path) -> None:
         workflow=[
             {"stage": "Structure", "status": "not_started", "status_label": "not started", "error": None,
              "outputs": 0, "wall_seconds": None, "preemptions": 0, "ledger_stage": None,
-             "note": "No input structure: this is de novo design, so the backbone is generated rather than supplied."},
+             "note": "No input structure: this is de novo design, so the backbone is generated rather than "
+                     "supplied. Nothing is missing."},
             {"stage": "Backbone generation", "status": "executed", "status_label": "executed", "error": None,
              "outputs": 1, "wall_seconds": 70.4, "preemptions": 0, "ledger_stage": "rfdiffusion", "note": None},
             {"stage": "Sequence design", "status": "executed", "status_label": "executed", "error": None,
@@ -170,12 +171,25 @@ def build_data_dir(data: Path) -> None:
             {"stage": "Structure prediction", "status": "failed", "status_label": "failed",
              "error": "Synthetic fixture: stage marked failed for the failure-path test.",
              "outputs": 1, "wall_seconds": 12.0, "preemptions": 0, "ledger_stage": "predict_esmfold", "note": None},
-            {"stage": "Evaluation", "status": "partial", "status_label": "partial", "error": None,
-             "outputs": 0, "wall_seconds": None, "preemptions": 0, "ledger_stage": "export_bundle",
-             "note": "Some metrics were measured and one was not."},
+            {"stage": "Evaluation", "status": "executed", "status_label": "executed", "error": None,
+             "outputs": 3, "wall_seconds": None, "preemptions": 0, "ledger_stage": None,
+             "note": "Computed from the bundled files: mpnn_best_score, predicted_best_mean_plddt, "
+                     "self_consistency_ca_rmsd_best."},
             {"stage": "Candidate review", "status": "not_started", "status_label": "not started", "error": None,
              "outputs": 0, "wall_seconds": None, "preemptions": 0, "ledger_stage": None,
-             "note": "Review happens in the app, not in the pipeline."},
+             "note": "Performed by a person in FoldStudio; the pipeline does not review its own candidates."},
+        ],
+        # One row per predicted structure, in the shape hpc/export_bundle.py writes: a design
+        # carries role "design"; a fold of ProteinMPNN's echoed input record carries
+        # role "input_sequence" and is left out of the run's metrics.
+        per_design=[
+            {"name": "design_0_s1", "file": "structures/design_0_s1.pdb", "n_residues": n, "role": "design",
+             "mean_plddt": round(sum(PLDDT) / n, 2),
+             "mean_plddt_source": "mean CA B-factor of the predicted PDB (pLDDT, 0-100)",
+             "pae_file": "structures/design_0_s1.pae.json",
+             "scrmsd": {"rmsd": 0.0, "aligned_atoms": n, "aligned_residues": n, "atom_type": "CA",
+                        "reason": None, "backbone": "design_0.pdb",
+                        "method": "optimal superposition, Kabsch algorithm (numpy SVD)"}},
         ],
     ))
 
@@ -205,6 +219,11 @@ def capture() -> dict[str, object]:
                 assert r.status_code == expect, f"GET {url} -> {r.status_code}: {r.text[:300]}"
                 return r.json()
 
+            def post_ok(url):
+                r = c.post(url)
+                assert r.status_code == 200, f"POST {url} -> {r.status_code}: {r.text[:300]}"
+                return r.json()
+
             structures = get("/api/structures")
             by_label = {s["label"]: s for s in structures}
             predicted = by_label["Fixture model (synthetic, with PAE)"]["id"]
@@ -222,6 +241,18 @@ def capture() -> dict[str, object]:
                             files={"file": ("uploaded.pdb", pdb(helix(6)).encode(), "text/plain")},
                             data={"label": "Uploaded fixture (synthetic)", "source": "uploaded"})
             assert upload.status_code == 201, upload.text
+            # A second upload, declared predicted, to capture what attaching a PAE file returns.
+            predicted_upload = c.post(
+                "/api/structures/upload",
+                files={"file": ("predicted.pdb", pdb(helix(6), bfactors=PLDDT[:6]).encode(), "text/plain")},
+                data={"label": "Uploaded predicted fixture (synthetic)", "source": "predicted"})
+            assert predicted_upload.status_code == 201, predicted_upload.text
+            pae_attached = c.post(
+                f"/api/structures/{predicted_upload.json()['id']}/pae",
+                files={"file": ("predicted.pae.json",
+                                json.dumps([{"predicted_aligned_error": pae_matrix(6)}]).encode(),
+                                "application/json")})
+            assert pae_attached.status_code == 201, pae_attached.text
 
             health = get("/api/health")
             health["data_dir"] = "<data-dir>"
@@ -243,7 +274,10 @@ def capture() -> dict[str, object]:
                 "compare": compare.json(),
                 "report": get("/api/reports?ids=hpc_fixture_run&format=json"),
                 "upload": upload.json(),
+                "pae_attached": pae_attached.json(),
                 "health": health,
+                # Last on purpose: a rescan replaces the report /api/health serves.
+                "reindex": post_ok("/api/experiments/reindex"),
             }
     finally:
         structure_store.new_id, sio.now_iso, exp_svc.now_iso, report_svc.now_iso = originals
