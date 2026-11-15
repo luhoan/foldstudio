@@ -1,0 +1,280 @@
+{
+  "generated_at": "2026-11-14T11:23:17Z",
+  "generator": "scripts/fetch_demo_data.py",
+  "contact_cutoff_angstrom": 4.5,
+  "pairs_for_prediction_vs_experiment": [
+    {
+      "experimental": "1lyz",
+      "predicted": "af-p00698-f1"
+    },
+    {
+      "experimental": "1ema",
+      "predicted": "af-p42212-f1"
+    }
+  ],
+  "structures": [
+    {
+      "id": "1crn",
+      "label": "Crambin",
+      "source": "experimental",
+      "database": "rcsb",
+      "origin_id": "1CRN",
+      "format": "pdb",
+      "url": "https://files.rcsb.org/download/1CRN.pdb",
+      "retrieved_at": "2026-11-14T11:23:17Z",
+      "sha256": "42199a30a0701864a2a5cc76cd7f35cc544cd0e65fbcf63e03c166543249b811",
+      "file": "structures/1crn.pdb",
+      "chains": [
+        "A"
+      ],
+      "n_residues": 46,
+      "title_from_entry": "WATER STRUCTURE OF A HYDROPHOBIC PROTEIN AT ATOMIC RESOLUTION. PENTAGON RINGS OF WATER MOLECULES IN CRYSTALS OF CRAMBIN",
+      "method_from_entry": [
+        "X-RAY DIFFRACTION"
+      ],
+      "chain_descriptions_from_entry": {
+        "A": "CRAMBIN"
+      },
+      "citation_from_entry": {
+        "title": "Water structure of a hydrophobic protein at atomic resolution: Pentagon rings of water molecules in crystals of crambin.",
+        "journal": "Proc Natl Acad Sci U S A",
+        "year": 1984
+      },
+      "slot": "crambin"
+    },
+    {
+      "id": "1ubq",
+      "label": "Ubiquitin",
+      "source": "experimental",
+      "database": "rcsb",
+      "origin_id": "1UBQ",
+      "format": "pdb",
+      "url": "https://files.rcsb.org/download/1UBQ.pdb",
+      "retrieved_at": "2026-11-14T11:23:17Z",
+      "sha256": "d4a6812d8951cf6594e6a0763f089e35f5a80b62acb3c117b2c5565228a7b161",
+      "file": "structures/1ubq.pdb",
+      "chains": [
+        "A"
+      ],
+      "n_residues": 76,
+      "title_from_entry": "STRUCTURE OF UBIQUITIN REFINED AT 1.8 ANGSTROMS RESOLUTION",
+      "method_from_entry": [
+        "X-RAY DIFFRACTION"
+      ],
+      "chain_descriptions_from_entry": {
+        "A": "UBIQUITIN"
+      },
+      "citation_from_entry": {
+        "title": "Structure of ubiquitin refined at 1.8 A resolution.",
+        "journal": "J Mol Biol",
+        "year": 1987
+      },
+      "slot": "ubiquitin"
+    },
+    {
+      "id": "1lyz",
+      "label": "Hen egg-white lysozyme (experimental)",
+      "source": "experimental",
+      "database": "rcsb",
+      "origin_id": "1LYZ",
+      "format": "pdb",
+      "url": "https://files.rcsb.org/download/1LYZ.pdb",
+      "retrieved_at": "2026-11-14T11:23:17Z",
+      "sha256": "28e95e819d4e0fc48acdf44209e37ba06f5c9d5d93d9950d67a760b32964326e",
+      "file": "structures/1lyz.pdb",
+      "chains": [
+        "A"
+      ],
+      "n_residues": 129,
+      "title_from_entry": "Real-space refinement of the structure of hen egg-white lysozyme",
+      "method_from_entry": [
+        "X-RAY DIFFRACTION"
+      ],
+      "chain_descriptions_from_entry": {
+        "A": "HEN EGG WHITE LYSOZYME"
+      },
+      "citation_from_entry": {
+        "title": "Real-space refinement of the structure of hen egg-white lysozyme.",
+        "journal": "J Mol Biol",
+        "year": 1974
+      },
+      "slot": "hewl_experimental"
+    },
+    {
+      "id": "af-p00698-f1",
+      "label": "Hen egg-white lysozyme (AlphaFold DB model)",
+      "source": "predicted",
+      "database": "afdb",
+      "origin_id": "AF-P00698-F1",
+      "uniprot": "P00698",
+      "format": "pdb",
+      "url": "https://alphafold.ebi.ac.uk/files/AF-P00698-F1-model_v6.pdb",
+      "retrieved_at": "2026-11-14T11:23:17Z",
+      "sha256": "b8280268982235a3598741e3d69f36c3b82d49d1176980b5f451ae81f04e70e5",
+      "file": "structures/af-p00698-f1.pdb",
+      "chains": [
+        "A"
+      ],
+      "n_residues": 147,
+      "model_version": 6,
+      "model_created": "2025-08-01T00:00:00Z",
+      "organism_from_entry": "Gallus gallus",
+      "slot": "hewl_predicted"
+    },
+    {
+      "id": "af-p42212-f1",
+      "label": "GFP (AlphaFold DB model, with PAE)",
+      "source": "predicted",
+      "database": "afdb",
+      "origin_id": "AF-P42212-F1",
+      "uniprot": "P42212",
+      "format": "pdb",
+      "url": "https://alphafold.ebi.ac.uk/files/AF-P42212-F1-model_v6.pdb",
+      "retrieved_at": "2026-11-14T11:23:17Z",
+      "sha256": "abfe2191b8474977143b60b866077b97526fa71c9d3c657304b348e21397323f",
+      "file": "structures/af-p42212-f1.pdb",
+      "chains": [
+        "A"
+      ],
+      "n_residues": 238,
+      "model_version": 6,
+      "model_created": "2025-08-01T00:00:00Z",
+      "organism_from_entry": "Aequorea victoria",
+      "pae": {
+        "file": "structures/af-p42212-f1.pae.json",
+        "url": "https://alphafold.ebi.ac.uk/files/AF-P42212-F1-predicted_aligned_error_v6.json",
+        "sha256": "b2838a1e0d38a31e133bec1f176c54578410f4b8a7b009b648b0c621a682ee88",
+        "size": 238
+      },
+      "slot": "gfp_predicted"
+    },
+    {
+      "id": "1ema",
+      "label": "GFP (experimental)",
+      "source": "experimental",
+      "database": "rcsb",
+      "origin_id": "1EMA",
+      "format": "pdb",
+      "url": "https://files.rcsb.org/download/1EMA.pdb",
+      "retrieved_at": "2026-11-14T11:23:17Z",
+      "sha256": "f1b9fdc2b871cc41f21f645a21b4948ce12d79b29197256330b108c9b503b088",
+      "file": "structures/1ema.pdb",
+      "chains": [
+        "A"
+      ],
+      "n_residues": 221,
+      "title_from_entry": "GREEN FLUORESCENT PROTEIN FROM AEQUOREA VICTORIA",
+      "method_from_entry": [
+        "X-RAY DIFFRACTION"
+      ],
+      "chain_descriptions_from_entry": {
+        "A": "GREEN FLUORESCENT PROTEIN"
+      },
+      "citation_from_entry": {
+        "title": "Crystal structure of the Aequorea victoria green fluorescent protein.",
+        "journal": "Science",
+        "year": 1996
+      },
+      "slot": "gfp_experimental"
+    },
+    {
+      "id": "6m0j",
+      "label": "SARS-CoV-2 RBD / ACE2 complex",
+      "source": "experimental",
+      "database": "rcsb",
+      "origin_id": "6M0J",
+      "format": "pdb",
+      "url": "https://files.rcsb.org/download/6M0J.pdb",
+      "retrieved_at": "2026-11-14T11:23:17Z",
+      "sha256": "51f27a495c0c12fa87f459a2510a9268d4d48a34b63ba3e5db5ae7c672a26af5",
+      "file": "structures/6m0j.pdb",
+      "chains": [
+        "A",
+        "E"
+      ],
+      "n_residues": 791,
+      "title_from_entry": "Crystal structure of SARS-CoV-2 spike receptor-binding domain bound with ACE2",
+      "method_from_entry": [
+        "X-RAY DIFFRACTION"
+      ],
+      "chain_descriptions_from_entry": {
+        "A": "Angiotensin-converting enzyme 2",
+        "E": "Spike protein S1"
+      },
+      "citation_from_entry": {
+        "title": "Structure of the SARS-CoV-2 spike receptor-binding domain bound to the ACE2 receptor.",
+        "journal": "Nature",
+        "year": 2020
+      },
+      "slot": "rbd_ace2"
+    },
+    {
+      "id": "1mlc",
+      "label": "Antibody-antigen complex (curated, public)",
+      "source": "experimental",
+      "database": "rcsb",
+      "origin_id": "1MLC",
+      "format": "pdb",
+      "url": "https://files.rcsb.org/download/1MLC.pdb",
+      "retrieved_at": "2026-11-14T11:23:17Z",
+      "sha256": "f905b2aeb97d8619f5a6f7a284faa3f91b334af9d2d07ecc877812f35c26c6f7",
+      "file": "structures/1mlc.pdb",
+      "chains": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F"
+      ],
+      "n_residues": 1122,
+      "title_from_entry": "MONOCLONAL ANTIBODY FAB D44.1 RAISED AGAINST CHICKEN EGG-WHITE LYSOZYME COMPLEXED WITH LYSOZYME",
+      "method_from_entry": [
+        "X-RAY DIFFRACTION"
+      ],
+      "chain_descriptions_from_entry": {
+        "A": "IGG1-KAPPA D44.1 FAB (LIGHT CHAIN)",
+        "B": "IGG1-KAPPA D44.1 FAB (HEAVY CHAIN)",
+        "C": "IGG1-KAPPA D44.1 FAB (LIGHT CHAIN)",
+        "D": "IGG1-KAPPA D44.1 FAB (HEAVY CHAIN)",
+        "E": "HEN EGG WHITE LYSOZYME",
+        "F": "HEN EGG WHITE LYSOZYME"
+      },
+      "citation_from_entry": {
+        "title": "Three-dimensional structures of the free and the antigen-complexed Fab from monoclonal anti-lysozyme antibody D44.1.",
+        "journal": "J Mol Biol",
+        "year": 1994
+      },
+      "slot": "antibody_antigen"
+    },
+    {
+      "id": "1qys",
+      "label": "De novo designed protein (deposited)",
+      "source": "experimental",
+      "database": "rcsb",
+      "origin_id": "1QYS",
+      "format": "pdb",
+      "url": "https://files.rcsb.org/download/1QYS.pdb",
+      "retrieved_at": "2026-11-14T11:23:17Z",
+      "sha256": "ac8fe04512d809dd11815493548ccb28bff3edaa52d1e14385a12cc3dc01d3fc",
+      "file": "structures/1qys.pdb",
+      "chains": [
+        "A"
+      ],
+      "n_residues": 91,
+      "title_from_entry": "Crystal structure of Top7: A computationally designed protein with a novel fold",
+      "method_from_entry": [
+        "X-RAY DIFFRACTION"
+      ],
+      "chain_descriptions_from_entry": {
+        "A": "TOP7"
+      },
+      "citation_from_entry": {
+        "title": "Design of a Novel Globular Protein Fold with Atomic-Level Accuracy",
+        "journal": "Science",
+        "year": 2003
+      },
+      "slot": "de_novo_designed"
+    }
+  ]
+}

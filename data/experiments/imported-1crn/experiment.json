@@ -1,0 +1,31 @@
+{
+  "id": "imported-1crn",
+  "created_at": "2026-11-14T11:23:17Z",
+  "kind": "imported",
+  "status": "ok",
+  "model_name": "none (experimental entry)",
+  "model_version": "n/a",
+  "settings": {},
+  "inputs": [
+    "1crn"
+  ],
+  "outputs": [
+    {
+      "type": "structure",
+      "path": "structures/1crn.pdb",
+      "sha256": "42199a30a0701864a2a5cc76cd7f35cc544cd0e65fbcf63e03c166543249b811",
+      "source": "experimental"
+    }
+  ],
+  "metrics": {
+    "n_residues": 46,
+    "n_chains": 1
+  },
+  "error": null,
+  "provenance": {
+    "source": "rcsb:1CRN",
+    "retrieved_at": "2026-11-14T11:23:17Z",
+    "url": "https://files.rcsb.org/download/1CRN.pdb",
+    "notes": "Deposited experimental coordinates imported as-is. FoldStudio did not run any experiment or model. Coordinates reflect the deposited sample and conditions only. Primary citation as listed in the entry metadata: {\"title\": \"Water structure of a hydrophobic protein at atomic resolution: Pentagon rings of water molecules in crystals of crambin.\", \"journal\": \"Proc Natl Acad Sci U S A\", \"year\": 1984} Limitations: single static model per entry; contact counts are geometric (heavy atoms within 4.5 A) and are not measurements of any physical property."
+  }
+}

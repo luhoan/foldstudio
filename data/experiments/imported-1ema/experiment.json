@@ -1,0 +1,31 @@
+{
+  "id": "imported-1ema",
+  "created_at": "2026-11-14T11:23:17Z",
+  "kind": "imported",
+  "status": "ok",
+  "model_name": "none (experimental entry)",
+  "model_version": "n/a",
+  "settings": {},
+  "inputs": [
+    "1ema"
+  ],
+  "outputs": [
+    {
+      "type": "structure",
+      "path": "structures/1ema.pdb",
+      "sha256": "f1b9fdc2b871cc41f21f645a21b4948ce12d79b29197256330b108c9b503b088",
+      "source": "experimental"
+    }
+  ],
+  "metrics": {
+    "n_residues": 221,
+    "n_chains": 1
+  },
+  "error": null,
+  "provenance": {
+    "source": "rcsb:1EMA",
+    "retrieved_at": "2026-11-14T11:23:17Z",
+    "url": "https://files.rcsb.org/download/1EMA.pdb",
+    "notes": "Deposited experimental coordinates imported as-is. FoldStudio did not run any experiment or model. Coordinates reflect the deposited sample and conditions only. Primary citation as listed in the entry metadata: {\"title\": \"Crystal structure of the Aequorea victoria green fluorescent protein.\", \"journal\": \"Science\", \"year\": 1996} Limitations: single static model per entry; contact counts are geometric (heavy atoms within 4.5 A) and are not measurements of any physical property."
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "id": "imported-af-p42212-f1",
+  "created_at": "2026-11-14T11:23:17Z",
+  "kind": "imported",
+  "status": "ok",
+  "model_name": "AlphaFold DB (precomputed)",
+  "model_version": "6",
+  "settings": {},
+  "inputs": [
+    "af-p42212-f1"
+  ],
+  "outputs": [
+    {
+      "type": "structure",
+      "path": "structures/af-p42212-f1.pdb",
+      "sha256": "abfe2191b8474977143b60b866077b97526fa71c9d3c657304b348e21397323f",
+      "source": "predicted"
+    },
+    {
+      "type": "pae",
+      "path": "structures/af-p42212-f1.pae.json",
+      "sha256": "b2838a1e0d38a31e133bec1f176c54578410f4b8a7b009b648b0c621a682ee88"
+    }
+  ],
+  "metrics": {
+    "n_residues": 238,
+    "n_chains": 1,
+    "mean_plddt_ca": 96.64
+  },
+  "error": null,
+  "provenance": {
+    "source": "afdb:AF-P42212-F1",
+    "retrieved_at": "2026-11-14T11:23:17Z",
+    "url": "https://alphafold.ebi.ac.uk/files/AF-P42212-F1-model_v6.pdb",
+    "notes": "Precomputed AlphaFold DB model imported as-is. FoldStudio did not run any model. pLDDT/PAE are model confidence, not proof of folding, binding, affinity, efficacy or safety. Limitations: single static model per entry; contact counts are geometric (heavy atoms within 4.5 A) and are not measurements of any physical property."
+  }
+}

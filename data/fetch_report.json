@@ -1,0 +1,17 @@
+{
+  "generated_at": "2026-11-14T11:23:17Z",
+  "succeeded": [
+    "1crn",
+    "1ubq",
+    "1lyz",
+    "af-p00698-f1",
+    "af-p42212-f1",
+    "1ema",
+    "6m0j",
+    "1mlc",
+    "1qys"
+  ],
+  "failed_verification_or_download": [],
+  "earlier_candidates_that_failed_before_a_later_one_verified": {},
+  "warnings": {}
+}

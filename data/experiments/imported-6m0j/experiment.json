@@ -1,0 +1,41 @@
+{
+  "id": "imported-6m0j",
+  "created_at": "2026-11-14T11:23:17Z",
+  "kind": "imported",
+  "status": "ok",
+  "model_name": "none (experimental entry)",
+  "model_version": "n/a",
+  "settings": {},
+  "inputs": [
+    "6m0j"
+  ],
+  "outputs": [
+    {
+      "type": "structure",
+      "path": "structures/6m0j.pdb",
+      "sha256": "51f27a495c0c12fa87f459a2510a9268d4d48a34b63ba3e5db5ae7c672a26af5",
+      "source": "experimental"
+    }
+  ],
+  "metrics": {
+    "n_residues": 791,
+    "n_chains": 2,
+    "interfaces": [
+      {
+        "chain_a": "A",
+        "chain_b": "E",
+        "cutoff_angstrom": 4.5,
+        "n_residue_pairs": 48,
+        "n_residues_a": 21,
+        "n_residues_b": 20
+      }
+    ]
+  },
+  "error": null,
+  "provenance": {
+    "source": "rcsb:6M0J",
+    "retrieved_at": "2026-11-14T11:23:17Z",
+    "url": "https://files.rcsb.org/download/6M0J.pdb",
+    "notes": "Deposited experimental coordinates imported as-is. FoldStudio did not run any experiment or model. Coordinates reflect the deposited sample and conditions only. Primary citation as listed in the entry metadata: {\"title\": \"Structure of the SARS-CoV-2 spike receptor-binding domain bound to the ACE2 receptor.\", \"journal\": \"Nature\", \"year\": 2020} Limitations: single static model per entry; contact counts are geometric (heavy atoms within 4.5 A) and are not measurements of any physical property."
+  }
+}

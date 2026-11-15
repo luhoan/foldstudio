@@ -1,0 +1,97 @@
+{
+  "id": "imported-1mlc",
+  "created_at": "2026-11-14T11:23:17Z",
+  "kind": "imported",
+  "status": "ok",
+  "model_name": "none (experimental entry)",
+  "model_version": "n/a",
+  "settings": {},
+  "inputs": [
+    "1mlc"
+  ],
+  "outputs": [
+    {
+      "type": "structure",
+      "path": "structures/1mlc.pdb",
+      "sha256": "f905b2aeb97d8619f5a6f7a284faa3f91b334af9d2d07ecc877812f35c26c6f7",
+      "source": "experimental"
+    }
+  ],
+  "metrics": {
+    "n_residues": 1122,
+    "n_chains": 6,
+    "interfaces": [
+      {
+        "chain_a": "A",
+        "chain_b": "B",
+        "cutoff_angstrom": 4.5,
+        "n_residue_pairs": 103,
+        "n_residues_a": 40,
+        "n_residues_b": 45
+      },
+      {
+        "chain_a": "A",
+        "chain_b": "E",
+        "cutoff_angstrom": 4.5,
+        "n_residue_pairs": 17,
+        "n_residues_a": 7,
+        "n_residues_b": 9
+      },
+      {
+        "chain_a": "A",
+        "chain_b": "F",
+        "cutoff_angstrom": 4.5,
+        "n_residue_pairs": 9,
+        "n_residues_a": 8,
+        "n_residues_b": 4
+      },
+      {
+        "chain_a": "B",
+        "chain_b": "D",
+        "cutoff_angstrom": 4.5,
+        "n_residue_pairs": 14,
+        "n_residues_a": 6,
+        "n_residues_b": 8
+      },
+      {
+        "chain_a": "B",
+        "chain_b": "E",
+        "cutoff_angstrom": 4.5,
+        "n_residue_pairs": 30,
+        "n_residues_a": 14,
+        "n_residues_b": 10
+      },
+      {
+        "chain_a": "C",
+        "chain_b": "D",
+        "cutoff_angstrom": 4.5,
+        "n_residue_pairs": 101,
+        "n_residues_a": 38,
+        "n_residues_b": 44
+      },
+      {
+        "chain_a": "C",
+        "chain_b": "F",
+        "cutoff_angstrom": 4.5,
+        "n_residue_pairs": 18,
+        "n_residues_a": 7,
+        "n_residues_b": 9
+      },
+      {
+        "chain_a": "D",
+        "chain_b": "F",
+        "cutoff_angstrom": 4.5,
+        "n_residue_pairs": 31,
+        "n_residues_a": 13,
+        "n_residues_b": 12
+      }
+    ]
+  },
+  "error": null,
+  "provenance": {
+    "source": "rcsb:1MLC",
+    "retrieved_at": "2026-11-14T11:23:17Z",
+    "url": "https://files.rcsb.org/download/1MLC.pdb",
+    "notes": "Deposited experimental coordinates imported as-is. FoldStudio did not run any experiment or model. Coordinates reflect the deposited sample and conditions only. Primary citation as listed in the entry metadata: {\"title\": \"Three-dimensional structures of the free and the antigen-complexed Fab from monoclonal anti-lysozyme antibody D44.1.\", \"journal\": \"J Mol Biol\", \"year\": 1994} Limitations: single static model per entry; contact counts are geometric (heavy atoms within 4.5 A) and are not measurements of any physical property."
+  }
+}
