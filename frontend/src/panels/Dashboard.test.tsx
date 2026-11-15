@@ -1,90 +1,113 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { fixtureIds, fixtures } from '@/api/fixtures'
+import type { Experiment } from '@/api'
+import { fixtureRoutes, installFetch } from '@/test/mockFetch'
+import { renderPanel } from '@/test/render'
 import { Dashboard } from './Dashboard'
 
-vi.mock('@/api', () => ({ listExperiments: vi.fn(), listStructures: vi.fn() }))
-import * as api from '@/api'
+const run = fixtures.experiments.find((e) => e.id === fixtureIds.pipelineRun)!
 
-function experiment(id: string, kind: string, status = 'ok', extra: Record<string, unknown> = {}) {
-  return {
-    id, created_at: '2026-01-01T00:00:00Z', kind, status,
-    model_name: `model-${id}`, model_version: '1', settings: {}, inputs: [], outputs: [],
-    metrics: {}, error: null,
-    provenance: { source: 's', retrieved_at: '2026-01-01T00:00:00Z', url: null, notes: 'n' },
-    ...extra,
-  }
+function stat(label: string): string {
+  const dt = screen.getAllByText(label).find((el) => el.tagName === 'DT') as HTMLElement
+  return (dt.nextElementSibling as HTMLElement).textContent ?? ''
 }
 
-function structure(id: string, source: string) {
-  return { id, label: id, source, origin_id: id, format: 'pdb', sha256: 'x', chains: [], n_residues: 1 }
-}
-
-/** Read the number rendered under a tile caption, scoped to one section. */
-function tile(sectionHeading: string, label: string) {
-  const heading = screen.getByText(sectionHeading)
-  const section = heading.parentElement as HTMLElement
-  const dt = within(section).getByText(label)
-  return dt.parentElement?.querySelector('dd')?.textContent
+function count<T>(items: T[], pick: (item: T) => string, value: string): number {
+  return items.filter((item) => pick(item) === value).length
 }
 
 describe('Dashboard', () => {
-  beforeEach(() => vi.clearAllMocks())
+  it('counts records by provenance and structures by source, from what the API returned', async () => {
+    installFetch(fixtureRoutes())
+    renderPanel(<Dashboard />)
+    await screen.findByRole('heading', { name: 'What is loaded' })
 
-  it('tells you what to do when nothing is loaded', async () => {
-    vi.mocked(api.listExperiments).mockResolvedValue([])
-    vi.mocked(api.listStructures).mockResolvedValue([])
-    render(<Dashboard />)
-    expect(await screen.findByText(/Nothing is loaded yet/)).toBeInTheDocument()
+    for (const kind of ['executed', 'imported', 'demo']) {
+      expect(stat(kind)).toBe(String(count(fixtures.experiments, (e) => e.kind, kind)))
+    }
+    expect(stat('predicted model')).toBe(String(count(fixtures.structures, (s) => s.source, 'predicted')))
+    expect(stat('experimental')).toBe(String(count(fixtures.structures, (s) => s.source, 'experimental')))
+    expect(stat('no declared source')).toBe(String(count(fixtures.structures, (s) => s.source, 'uploaded')))
+    // A bucket with nothing in it is shown as zero, not hidden and not filled in.
+    expect(count(fixtures.experiments, (e) => e.kind, 'demo')).toBe(0)
+    expect(stat('demo')).toBe('0')
+    // The page says what the provenance labels mean.
+    expect(screen.getByText('Ran here: the pipeline produced these files on this installation.')).toBeInTheDocument()
   })
 
-  it('surfaces an unreachable backend instead of rendering zeroes as fact', async () => {
-    vi.mocked(api.listExperiments).mockRejectedValue(new Error('connection refused'))
-    vi.mocked(api.listStructures).mockResolvedValue([])
-    render(<Dashboard />)
-    expect(await screen.findByRole('alert')).toHaveTextContent('connection refused')
+  it('leads with the latest pipeline run: every stage and the status the pipeline recorded', async () => {
+    installFetch(fixtureRoutes())
+    renderPanel(<Dashboard />)
+
+    const card = within((await screen.findByRole('heading', { name: 'Latest design run' })).closest('section') as HTMLElement)
+    expect(card.getByText(run.id)).toBeInTheDocument()
+    expect(card.getByText('partial')).toBeInTheDocument()
+    const items = card.getAllByRole('listitem')
+    expect(items.map((li) => li.textContent)).toEqual(
+      run.workflow!.map((s, i) => `Stage ${i + 1}${s.stage}${s.status_label ?? s.status}${s.error ?? ''}`))
+    expect(card.getByRole('alert')).toHaveTextContent(run.error!)
+    expect(card.getByRole('link', { name: 'Follow this run stage by stage' })).toHaveAttribute('href', `/design?run=${run.id}`)
+    expect(card.getByRole('link', { name: 'Open the full record' })).toHaveAttribute('href', `/history?experiment=${run.id}`)
   })
 
-  it('counts experiments by provenance kind', async () => {
-    vi.mocked(api.listExperiments).mockResolvedValue([
-      experiment('a', 'imported'), experiment('b', 'imported'), experiment('c', 'executed'),
-    ] as never)
-    vi.mocked(api.listStructures).mockResolvedValue([])
-    render(<Dashboard />)
-    expect(await screen.findByText('Experiments by provenance')).toBeInTheDocument()
-    expect(tile('Experiments by provenance', 'imported')).toBe('2')
-    expect(tile('Experiments by provenance', 'executed')).toBe('1')
-    // A kind with no records reads zero rather than being hidden.
-    expect(tile('Experiments by provenance', 'demo')).toBe('0')
+  it('prefers a run that was executed here over a newer demo, and labels a demo as a demo', async () => {
+    const demo: Experiment = { ...run, id: 'hpc_dry_run', kind: 'demo', created_at: '2026-12-01T00:00:00Z' }
+    installFetch(fixtureRoutes({ 'GET /experiments': [demo, run] }))
+    const view = renderPanel(<Dashboard />)
+    const card = within((await screen.findByRole('heading', { name: 'Latest design run' })).closest('section') as HTMLElement)
+    expect(card.getByText(run.id)).toBeInTheDocument()
+    view.unmount()
   })
 
-  it('counts structures by source', async () => {
-    vi.mocked(api.listExperiments).mockResolvedValue([])
-    vi.mocked(api.listStructures).mockResolvedValue([
-      structure('s1', 'predicted'), structure('s2', 'experimental'), structure('s3', 'experimental'),
-    ] as never)
-    render(<Dashboard />)
-    expect(await screen.findByText('Structures by source')).toBeInTheDocument()
-    expect(tile('Structures by source', 'predicted')).toBe('1')
-    expect(tile('Structures by source', 'experimental')).toBe('2')
-    expect(tile('Structures by source', 'uploaded')).toBe('0')
+  it('says so when the only run on record is not one that was executed here', async () => {
+    const demo: Experiment = { ...run, id: 'hpc_dry_run', kind: 'demo', error: null }
+    installFetch(fixtureRoutes({ 'GET /experiments': [demo] }))
+    renderPanel(<Dashboard />)
+    await screen.findByRole('heading', { name: 'Latest design run' })
+    expect(screen.getByText('This record is a demo: no model was run to produce it.')).toBeInTheDocument()
   })
 
-  it('calls out failed and partial runs with their recorded error', async () => {
-    vi.mocked(api.listExperiments).mockResolvedValue([
-      experiment('good', 'executed', 'ok'),
-      experiment('bad', 'executed', 'partial', { error: 'predict stage died' }),
-    ] as never)
-    vi.mocked(api.listStructures).mockResolvedValue([])
-    render(<Dashboard />)
-    expect(await screen.findByText('Needs attention')).toBeInTheDocument()
-    expect(screen.getByText(/predict stage died/)).toBeInTheDocument()
+  it('lists records that ended failed or partial, with the error they recorded', async () => {
+    installFetch(fixtureRoutes())
+    renderPanel(<Dashboard />)
+    const card = within((await screen.findByRole('heading', { name: 'Needs attention' })).closest('section') as HTMLElement)
+    expect(card.getByRole('link', { name: run.id })).toHaveAttribute('href', `/history?experiment=${run.id}`)
+    expect(card.getByText(run.error!)).toBeInTheDocument()
+    expect(card.getAllByRole('listitem')).toHaveLength(fixtures.experiments.filter((e) => e.status !== 'ok').length)
   })
 
-  it('does not show the attention block when every run is ok', async () => {
-    vi.mocked(api.listExperiments).mockResolvedValue([experiment('good', 'executed', 'ok')] as never)
-    vi.mocked(api.listStructures).mockResolvedValue([])
-    render(<Dashboard />)
-    expect(await screen.findByText('Most recent')).toBeInTheDocument()
-    expect(screen.queryByText('Needs attention')).not.toBeInTheDocument()
+  it('links recent structures into the viewer', async () => {
+    installFetch(fixtureRoutes())
+    renderPanel(<Dashboard />)
+    const card = within((await screen.findByRole('heading', { name: 'Structures' })).closest('section') as HTMLElement)
+    const links = card.getAllByRole('link', { name: 'View in 3D' })
+    expect(links).toHaveLength(fixtures.structures.length)
+    expect(links.map((l) => l.getAttribute('href')).sort()).toEqual(fixtures.structures.map((s) => `/explorer?structure=${s.id}`).sort())
+  })
+
+  it('shows zeros and how to load data when nothing is loaded, rather than placeholder numbers', async () => {
+    installFetch(fixtureRoutes({ 'GET /experiments': [], 'GET /structures': [] }))
+    renderPanel(<Dashboard />)
+    await screen.findByText('Nothing is loaded yet')
+    expect(screen.getByText('python3 scripts/fetch_demo_data.py')).toBeInTheDocument()
+    for (const label of ['executed', 'imported', 'demo', 'predicted model', 'experimental', 'no declared source']) expect(stat(label)).toBe('0')
+    expect(screen.queryByRole('heading', { name: 'Latest design run' })).not.toBeInTheDocument()
+  })
+
+  it('reports an unreachable backend instead of showing zeros as if they were real', async () => {
+    installFetch(fixtureRoutes({
+      'GET /experiments': { status: 500, body: { detail: 'backend down' } },
+      'GET /structures': { status: 500, body: { detail: 'backend down' } },
+    }))
+    renderPanel(<Dashboard />)
+    await screen.findByText('Structures: backend down · Experiments: backend down')
+    expect(screen.queryByText('Nothing is loaded yet')).not.toBeInTheDocument()
+  })
+
+  it('keeps the caveat on screen', async () => {
+    installFetch(fixtureRoutes())
+    renderPanel(<Dashboard />)
+    await screen.findByText(/They do not establish folding, binding\s+affinity, efficacy or safety\. Not a clinical tool\./)
   })
 })

@@ -1,5 +1,15 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterEach, vi } from 'vitest'
+import { resetLibrary } from '@/panels/library'
+import { resetPanelState } from '@/panels/panelState'
+import { resetViewerStore } from '@/viewer/store'
 
-afterEach(() => cleanup())
+// Module-level stores outlive a component, so each test starts from a clean slate.
+afterEach(() => {
+  cleanup()
+  resetLibrary()
+  resetPanelState()
+  resetViewerStore()
+  vi.unstubAllGlobals()
+})

@@ -1,6 +1,8 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
+import { fixtures } from '@/api/fixtures'
+import { fixtureRoutes, installFetch } from '@/test/mockFetch'
 import { NAV_ITEMS, PanelSlot, appRoutes, registerPanel } from './index'
 import { clearPanels } from './slots'
 
@@ -11,10 +13,9 @@ function renderAt(path: string) {
 beforeEach(() => {
   clearPanels()
   localStorage.clear()
-  // Explorer fetches the sample manifest; stub it so tests never hit the network.
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }))
+  // The shell reports whether the backend answers, so every test gives it one that does.
+  installFetch(fixtureRoutes())
 })
-afterEach(() => vi.unstubAllGlobals())
 
 describe('PanelSlot', () => {
   it('shows a placeholder naming the slot when nothing is registered', () => {
@@ -68,6 +69,11 @@ describe('AppShell + routes', () => {
     expect(NAV_ITEMS).toHaveLength(8)
   })
 
+  it('keeps the research-tool caveat in the shell on every page', () => {
+    renderAt('/settings')
+    expect(screen.getByText('Research review tool. Not a clinical tool. Confidence scores are model estimates, not validation.')).toBeInTheDocument()
+  })
+
   it('mounts panels registered for a route main slot and for the right sidebar', () => {
     registerPanel({ id: 'hist', slot: 'history.main', component: () => <p>history panel</p> })
     registerPanel({ id: 'side', slot: 'right', component: () => <p>side panel</p> })
@@ -75,6 +81,15 @@ describe('AppShell + routes', () => {
     expect(screen.getByRole('heading', { name: 'Experiment History' })).toBeInTheDocument()
     expect(screen.getByText('history panel')).toBeInTheDocument()
     expect(screen.getByText('side panel')).toBeInTheDocument()
+  })
+
+  it('gives the Protein Explorer a main slot and a slot below it', () => {
+    registerPanel({ id: 'view', slot: 'explorer.main', component: () => <p>viewer panel</p> })
+    registerPanel({ id: 'under', slot: 'explorer.below', component: () => <p>panel below</p> })
+    renderAt('/explorer')
+    expect(screen.getByRole('heading', { name: 'Protein Explorer' })).toBeInTheDocument()
+    const order = screen.getAllByText(/viewer panel|panel below/).map((n) => n.textContent)
+    expect(order).toEqual(['viewer panel', 'panel below'])
   })
 
   it('collapses and expands the right sidebar', async () => {
@@ -90,5 +105,35 @@ describe('AppShell + routes', () => {
   it('falls back to the dashboard for unknown paths', () => {
     renderAt('/nope')
     expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+  })
+})
+
+describe('backend status in the shell', () => {
+  it('says the backend is connected and how much it holds', async () => {
+    renderAt('/')
+    await screen.findByText(`Connected: ${fixtures.structures.length} structures, ${fixtures.experiments.length} experiments`)
+  })
+
+  it('says when the backend is connected but empty', async () => {
+    installFetch(fixtureRoutes({ 'GET /structures': [], 'GET /experiments': [] }))
+    renderAt('/')
+    await screen.findByText('Connected. Nothing loaded yet')
+  })
+
+  it('says how to start the backend when it does not answer, and recovers on reload', async () => {
+    let up = false
+    const net = installFetch(fixtureRoutes({
+      'GET /structures': () => (up ? fixtures.structures : { status: 502, body: { detail: 'connection refused' } }),
+      'GET /experiments': () => (up ? fixtures.experiments : { status: 502, body: { detail: 'connection refused' } }),
+    }))
+    renderAt('/')
+    const status = await screen.findByText(/Backend not reachable/)
+    expect(status).toHaveTextContent('start it with ./run.sh in backend/, then reload.')
+
+    up = true
+    const before = net.callsTo('GET /structures').length
+    await userEvent.click(screen.getByRole('button', { name: 'Reload structures and experiments' }))
+    await screen.findByText(/^Connected:/)
+    await waitFor(() => expect(net.callsTo('GET /structures').length).toBe(before + 1))
   })
 })

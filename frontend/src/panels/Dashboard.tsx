@@ -1,146 +1,170 @@
-import { useEffect, useState } from 'react'
-import { listExperiments, listStructures } from '@/api'
 import type { Experiment, Structure } from '@/api'
+import { StageStatus, ValueView } from './ExperimentDetail'
+import { formatDate, kindMeaning, sourceLabel, sourceMeaning } from './format'
+import { useLibrary } from './library'
+import { designLink, explorerLink, historyLink } from './links'
+import { Card, Code, EmptyState, ErrorNote, KindBadge, Loading, Note, SourceBadge, Stat, StatusBadge, TextLink } from './ui'
 
 /**
  * Overview of what is actually loaded.
  *
- * Every number here is a count of real records returned by the API. Nothing is
- * a target, a projection or a placeholder: if a bucket is zero it is shown as
- * zero, because an empty dashboard is information and an invented one is not.
+ * Every number here is a count of real records returned by the API, or a metric a run recorded.
+ * Nothing is a target, a projection or a placeholder: if a bucket is zero it is shown as zero,
+ * because an empty dashboard is information and an invented one is not.
  *
- * The kind breakdown is the point of the page. "imported" and "demo" records
- * came from somewhere else; only "executed" means this installation ran the
- * pipeline and produced the files itself.
+ * The provenance breakdown is the point of the page. "imported" and "demo" records came from
+ * somewhere else; only "executed" means this installation ran the pipeline and produced the files.
  */
 
 const KINDS = ['executed', 'imported', 'demo'] as const
-const KIND_BLURB: Record<string, string> = {
-  executed: 'Ran here: the pipeline produced these files on this installation.',
-  imported: 'Brought in from a public database as-is. No model was run here.',
-  demo: 'Illustrative fixtures. Not a run.',
-}
-const SOURCE_BLURB: Record<string, string> = {
-  predicted: 'Model output. B-factors carry pLDDT, so confidence can be read.',
-  experimental: 'Deposited coordinates. B-factors are not confidence.',
-  uploaded: 'Provided without a declared source, so confidence is not reported.',
-}
+const SOURCES = ['predicted', 'experimental', 'uploaded'] as const
 
-function countBy<T>(items: T[], key: (t: T) => string): Record<string, number> {
+const RUN_FIGURES: Array<{ key: string; label: string; unit?: string }> = [
+  { key: 'self_consistency_ca_rmsd_best', label: 'Best self-consistency RMSD', unit: 'Å' },
+  { key: 'predicted_best_mean_plddt', label: 'Best mean pLDDT' },
+  { key: 'n_predicted_structures', label: 'Structures predicted' },
+]
+
+function countBy<T>(items: T[], key: (item: T) => string): Record<string, number> {
   const out: Record<string, number> = {}
-  for (const it of items) out[key(it)] = (out[key(it)] ?? 0) + 1
+  for (const item of items) out[key(item)] = (out[key(item)] ?? 0) + 1
   return out
 }
 
-function Tile({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
+function byNewest<T extends { created_at: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+}
+
+/** The newest pipeline run, with every stage and the status the pipeline recorded for it. */
+function LatestRun({ run }: { run: Experiment }) {
+  const stages = run.workflow ?? []
+  const figures = RUN_FIGURES.filter(({ key }) => key in run.metrics)
+  const definitions = run.metric_definitions ?? {}
   return (
-    <div className="rounded border border-border p-3">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="font-mono text-2xl">{value}</dd>
-      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
-    </div>
+    <Card
+      title="Latest design run"
+      description={`${run.model_name}. Recorded ${formatDate(run.created_at)}.`}
+      actions={<><KindBadge kind={run.kind} /><StatusBadge status={run.status} /></>}
+    >
+      <div className="space-y-5">
+        <p className="font-mono text-sm break-all text-muted-foreground">{run.id}</p>
+        {run.error && <ErrorNote>{run.error}</ErrorNote>}
+        {run.kind !== 'executed' && (
+          <Note>This record is {run.kind === 'demo' ? 'a demo: no model was run to produce it' : 'imported: it was not run on this installation'}.</Note>
+        )}
+
+        <ol className="grid gap-x-3 gap-y-4 sm:grid-cols-3 xl:grid-cols-6">
+          {stages.map((stage, index) => (
+            <li key={stage.stage} className="relative border-t-2 border-border pt-3">
+              <span className="block text-xs text-muted-foreground">Stage {index + 1}</span>
+              {/* two lines reserved in the six-across layout, so every badge sits on the same line */}
+              <span className="block font-medium xl:min-h-[2.75rem]">{stage.stage}</span>
+              <span className="mt-1.5 block"><StageStatus stage={stage} /></span>
+              {stage.error && <span className="mt-1.5 block text-xs text-muted-foreground">{stage.error}</span>}
+            </li>
+          ))}
+        </ol>
+
+        {figures.length > 0 && (
+          <dl className="grid grid-cols-2 gap-x-8 gap-y-5 border-t border-border pt-4 md:grid-cols-3">
+            {figures.map(({ key, label, unit }) => (
+              <Stat key={key} label={label} unit={unit} value={<ValueView value={run.metrics[key]} />} hint={definitions[key]} />
+            ))}
+          </dl>
+        )}
+
+        <p className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+          <TextLink to={designLink(run.id)}>Follow this run stage by stage</TextLink>
+          <TextLink to={historyLink(run.id)}>Open the full record</TextLink>
+        </p>
+      </div>
+    </Card>
+  )
+}
+
+function Counts({ experiments, structures }: { experiments: Experiment[]; structures: Structure[] }) {
+  const byKind = countBy(experiments, (e) => e.kind)
+  const bySource = countBy(structures, (s) => s.source)
+  return (
+    <Card title="What is loaded" description="Counts of the records the backend holds right now. Nothing here is projected.">
+      <div className="grid gap-8 lg:grid-cols-2">
+        <section>
+          <h3 className="mb-3 text-sm font-semibold">{experiments.length} experiment record{experiments.length === 1 ? '' : 's'}, by provenance</h3>
+          <dl className="grid grid-cols-3 gap-x-6 gap-y-4">
+            {KINDS.map((kind) => <Stat key={kind} label={kind} value={byKind[kind] ?? 0} hint={kindMeaning(kind)} />)}
+          </dl>
+        </section>
+        <section>
+          <h3 className="mb-3 text-sm font-semibold">{structures.length} structure{structures.length === 1 ? '' : 's'}, by source</h3>
+          <dl className="grid grid-cols-3 gap-x-6 gap-y-4">
+            {SOURCES.map((source) => <Stat key={source} label={sourceLabel(source)} value={bySource[source] ?? 0} hint={sourceMeaning(source)} />)}
+          </dl>
+        </section>
+      </div>
+    </Card>
   )
 }
 
 export function Dashboard() {
-  const [experiments, setExperiments] = useState<Experiment[]>([])
-  const [structures, setStructures] = useState<Structure[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const library = useLibrary()
+  if (library.status !== 'ready') return <Loading>Loading…</Loading>
 
-  useEffect(() => {
-    let alive = true
-    Promise.all([listExperiments(), listStructures()])
-      .then(([e, s]) => { if (alive) { setExperiments(e); setStructures(s) } })
-      .catch((e: unknown) => {
-        if (alive) setError(e instanceof Error ? e.message : 'Could not reach the API')
-      })
-      .finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
-  }, [])
-
-  const byKind = countBy(experiments, (e) => e.kind)
-  const bySource = countBy(structures, (s) => s.source)
-  const failed = experiments.filter((e) => e.status === 'failed' || e.status === 'partial')
-  const recent = [...experiments]
-    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
-    .slice(0, 5)
-
-  if (loading) return <section className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">Loading…</section>
+  const { experiments, structures } = library
+  const runs = byNewest(experiments.filter((e) => Array.isArray(e.workflow) && e.workflow.length > 0))
+  const latestRun = runs.find((e) => e.kind === 'executed') ?? runs[0] ?? null
+  const attention = experiments.filter((e) => e.status === 'failed' || e.status === 'partial')
+  const recentStructures = byNewest(structures).slice(0, 6)
+  const empty = experiments.length === 0 && structures.length === 0
 
   return (
-    <section className="space-y-4 rounded-lg border border-border bg-card p-4">
-      <header>
-        <h2 className="text-base font-semibold">Overview</h2>
-        <p className="text-sm text-muted-foreground">Counts of the records currently loaded. Nothing here is projected.</p>
-      </header>
+    <div className="flex flex-col gap-4">
+      {library.error && <ErrorNote>{library.error}</ErrorNote>}
 
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-
-      {!error && experiments.length === 0 && structures.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          Nothing is loaded yet. Run <code className="font-mono">python3 scripts/fetch_demo_data.py</code> and
-          restart the backend, or export a pipeline bundle into <code className="font-mono">data/experiments/</code>.
-        </p>
+      {empty && !library.error && (
+        <EmptyState title="Nothing is loaded yet">
+          Download the reference set with <Code>python3 scripts/fetch_demo_data.py</Code>, or import a pipeline bundle
+          with <Code>python3 scripts/hpc_import_bundle.py &lt;bundle.tar.gz&gt;</Code>. Then press the reload button
+          at the top of the page, or restart the backend.
+        </EmptyState>
       )}
 
-      <div>
-        <h3 className="mb-2 text-sm font-semibold">Experiments by provenance</h3>
-        <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {KINDS.map((k) => <Tile key={k} label={k} value={byKind[k] ?? 0} hint={KIND_BLURB[k]} />)}
-          <Tile label="total" value={experiments.length} />
-        </dl>
-      </div>
+      {latestRun && <LatestRun run={latestRun} />}
 
-      <div>
-        <h3 className="mb-2 text-sm font-semibold">Structures by source</h3>
-        <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {(['predicted', 'experimental', 'uploaded'] as const).map((s) => (
-            <Tile key={s} label={s} value={bySource[s] ?? 0} hint={SOURCE_BLURB[s]} />
-          ))}
-          <Tile label="total" value={structures.length} />
-        </dl>
-      </div>
+      <Counts experiments={experiments} structures={structures} />
 
-      {failed.length > 0 && (
-        <div className="rounded border border-destructive/40 p-3">
-          <h3 className="mb-2 text-sm font-semibold">Needs attention</h3>
-          <ul className="space-y-1 text-xs">
-            {failed.map((e) => (
-              <li key={e.id}>
-                <span className="font-mono">{e.id}</span> — {e.status}
-                {e.error ? `: ${e.error}` : ''}
+      {attention.length > 0 && (
+        <Card title="Needs attention" description="Records that ended failed or partial, with the error they recorded.">
+          <ul className="divide-y divide-border/60">
+            {attention.map((e) => (
+              <li key={e.id} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-2.5 text-sm">
+                <TextLink to={historyLink(e.id)}>{e.id}</TextLink>
+                <StatusBadge status={e.status} />
+                <span className="min-w-0 flex-1 text-muted-foreground">{e.error ?? 'No error text was recorded.'}</span>
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
       )}
 
-      {recent.length > 0 && (
-        <div className="overflow-x-auto">
-          <h3 className="mb-2 text-sm font-semibold">Most recent</h3>
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr><th className="p-2">Experiment</th><th className="p-2">Kind</th><th className="p-2">Status</th><th className="p-2">Model</th></tr>
-            </thead>
-            <tbody>
-              {recent.map((e) => (
-                <tr key={e.id} className="border-t border-border">
-                  <td className="p-2 font-mono">{e.id}</td>
-                  <td className="p-2">{e.kind}</td>
-                  <td className="p-2">{e.status}</td>
-                  <td className="p-2">{e.model_name}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {recentStructures.length > 0 && (
+        <Card title="Structures" description={structures.length > recentStructures.length ? `The ${recentStructures.length} most recently added of ${structures.length}.` : undefined}>
+          <ul className="divide-y divide-border/60">
+            {recentStructures.map((s) => (
+              <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2.5 text-sm">
+                <span className="min-w-0 flex-1 font-medium break-words">{s.label}</span>
+                <SourceBadge source={s.source} />
+                <span className="text-muted-foreground">{s.n_residues} residues</span>
+                {s.format !== 'fasta' && <TextLink to={explorerLink(s.id)}>View in 3D</TextLink>}
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
 
-      <p className="text-xs text-muted-foreground">
-        Confidence scores and structural predictions are model estimates. They do not establish
-        folding, binding affinity, efficacy or safety. Not a clinical tool.
-      </p>
-    </section>
+      <Note className="max-w-[95ch]">
+        Confidence scores and structural predictions are model estimates. They do not establish folding, binding
+        affinity, efficacy or safety. Not a clinical tool.
+      </Note>
+    </div>
   )
 }

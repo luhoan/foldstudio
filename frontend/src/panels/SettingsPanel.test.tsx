@@ -1,50 +1,76 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it } from 'vitest'
+import { fixtures } from '@/api/fixtures'
+import { fixtureRoutes, installFetch } from '@/test/mockFetch'
+import { renderPanel } from '@/test/render'
 import { SettingsPanel } from './SettingsPanel'
 
-vi.mock('@/api', () => ({
-  API_BASE_URL: '/api',
-  USE_MOCKS: false,
-  listExperiments: vi.fn(),
-  listStructures: vi.fn(),
-}))
-import * as api from '@/api'
+const health = fixtures.health
 
 describe('SettingsPanel', () => {
-  beforeEach(() => vi.clearAllMocks())
+  it('shows what the app is connected to and what the backend says about itself', async () => {
+    installFetch(fixtureRoutes())
+    renderPanel(<SettingsPanel />)
 
-  it('reports a reachable backend with what it found', async () => {
-    vi.mocked(api.listExperiments).mockResolvedValue([{ id: 'a' }] as never)
-    vi.mocked(api.listStructures).mockResolvedValue([{ id: 's' }, { id: 't' }] as never)
-    render(<SettingsPanel />)
-    expect(await screen.findByText(/reachable — 1 experiment\(s\), 2 structure\(s\)/)).toBeInTheDocument()
-  })
-
-  it('reports an unreachable backend and how to start it', async () => {
-    vi.mocked(api.listExperiments).mockRejectedValue(new Error('connection refused'))
-    vi.mocked(api.listStructures).mockRejectedValue(new Error('connection refused'))
-    render(<SettingsPanel />)
-    expect(await screen.findByText(/unreachable — connection refused/)).toBeInTheDocument()
-    expect(screen.getByText(/run\.sh/)).toBeInTheDocument()
-  })
-
-  it('re-checks on demand', async () => {
-    vi.mocked(api.listExperiments).mockRejectedValue(new Error('down'))
-    vi.mocked(api.listStructures).mockRejectedValue(new Error('down'))
-    render(<SettingsPanel />)
-    expect(await screen.findByText(/unreachable/)).toBeInTheDocument()
-
-    vi.mocked(api.listExperiments).mockResolvedValue([] as never)
-    vi.mocked(api.listStructures).mockResolvedValue([] as never)
-    fireEvent.click(screen.getByRole('button', { name: 'Re-check connection' }))
-    expect(await screen.findByText(/reachable — 0 experiment\(s\), 0 structure\(s\)/)).toBeInTheDocument()
-  })
-
-  it('shows the configured API base and mock mode', async () => {
-    vi.mocked(api.listExperiments).mockResolvedValue([] as never)
-    vi.mocked(api.listStructures).mockResolvedValue([] as never)
-    render(<SettingsPanel />)
-    expect(await screen.findByText('API base URL')).toBeInTheDocument()
+    await screen.findByText(`reachable: ${fixtures.experiments.length} experiments, ${fixtures.structures.length} structures`)
+    expect(screen.getByText('/api')).toBeInTheDocument()
     expect(screen.getByText('off')).toBeInTheDocument()
+    expect(screen.getByText(health.data_dir)).toBeInTheDocument()
+    expect(screen.getByText(health.runners.length ? health.runners.join(', ') : 'none registered')).toBeInTheDocument()
+  })
+
+  it('reports what the backend loaded from data/experiments, with links to the records', async () => {
+    installFetch(fixtureRoutes())
+    renderPanel(<SettingsPanel />)
+    const card = within((await screen.findByRole('heading', { name: 'Experiment bundles' })).closest('section') as HTMLElement)
+    const report = health.reindex
+    await card.findByText(new RegExp(`${report.imported.length} bundles loaded, ${report.structures_registered.length} structures? registered`))
+    for (const id of report.imported) expect(card.getByRole('link', { name: id })).toHaveAttribute('href', `/history?experiment=${id}`)
+  })
+
+  it('shows every bundle the backend could not load, with its path and the reason', async () => {
+    const broken = { ...health, reindex: { ...health.reindex, errors: [{ path: 'data/experiments/hpc_bad/experiment.json', error: 'schema: kind must be one of executed, imported, demo' }] } }
+    installFetch(fixtureRoutes({ 'GET /health': broken }))
+    renderPanel(<SettingsPanel />)
+    await screen.findByText('1 bundle could not be loaded:')
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('data/experiments/hpc_bad/experiment.json')
+    expect(alert).toHaveTextContent('schema: kind must be one of executed, imported, demo')
+  })
+
+  it('rescans on request, shows the new report and reloads the shared library', async () => {
+    const after = { ...fixtures.reindex, imported: [...fixtures.reindex.imported, 'hpc_new_run'], structures_registered: ['st_new'] }
+    const net = installFetch(fixtureRoutes({ 'POST /experiments/reindex': after }))
+    renderPanel(<SettingsPanel />)
+    await screen.findByText(new RegExp(`${health.reindex.imported.length} bundles loaded`))
+    const before = net.callsTo('GET /structures').length
+
+    await userEvent.click(screen.getByRole('button', { name: 'Rescan now' }))
+    await screen.findByText(new RegExp(`${after.imported.length} bundles loaded, 1 structure registered`))
+    expect(screen.getByRole('link', { name: 'hpc_new_run' })).toBeInTheDocument()
+    expect(net.callsTo('POST /experiments/reindex')).toHaveLength(1)
+    await waitFor(() => expect(net.callsTo('GET /structures').length).toBeGreaterThan(before))
+  })
+
+  it('reports an unreachable backend and how to start it, and recovers on "Check again"', async () => {
+    let up = false
+    installFetch(fixtureRoutes({ 'GET /health': () => (up ? health : { status: 502, body: { detail: 'connection refused' } }) }))
+    renderPanel(<SettingsPanel />)
+    await screen.findByText('unreachable: connection refused')
+    expect(screen.getByText('Not available while the backend cannot be reached.')).toBeInTheDocument()
+    up = true
+    await userEvent.click(screen.getByRole('button', { name: 'Check again' }))
+    await screen.findByText(/^reachable:/)
+  })
+
+  it('offers no preference toggles, because nothing would read them', async () => {
+    installFetch(fixtureRoutes())
+    renderPanel(<SettingsPanel />)
+    await screen.findByText(/^reachable:/)
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+    expect(screen.queryAllByRole('switch')).toHaveLength(0)
+    expect(screen.queryAllByRole('textbox')).toHaveLength(0)
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Check again', 'Rescan now'])
   })
 })

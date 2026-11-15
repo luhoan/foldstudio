@@ -1,19 +1,26 @@
 import { registerPanel } from '@/layout'
-import { RightSidebar } from './RightSidebar'
-import { PAEHeatmap } from './PAEHeatmap'
-import { ComparisonView } from './ComparisonView'
-import { ExperimentHistory } from './ExperimentHistory'
-import { WorkflowStepper } from './WorkflowStepper'
+import { AlignmentPanel } from './AlignmentPanel'
 import { CandidateLibrary } from './CandidateLibrary'
 import { Dashboard } from './Dashboard'
+import { ExperimentComparison } from './ExperimentComparison'
+import { ExperimentHistory } from './ExperimentHistory'
+import { PAEHeatmap } from './PAEHeatmap'
+import { RightSidebar } from './RightSidebar'
+import { SequencePanel } from './SequencePanel'
 import { SettingsPanel } from './SettingsPanel'
+import { StructureExplorer } from './StructureExplorer'
+import { WorkflowStepper } from './WorkflowStepper'
 
-registerPanel({ id: 'stream5-right-sidebar', slot: 'right', title: 'Structure details', order: 20, component: RightSidebar })
-registerPanel({ id: 'stream5-pae', slot: 'explorer.below', title: 'PAE heatmap', order: 30, component: PAEHeatmap })
-registerPanel({ id: 'stream5-analysis-comparison', slot: 'analysis.main', title: 'Structural comparison', order: 20, component: ComparisonView })
-registerPanel({ id: 'stream5-comparison', slot: 'comparison.main', title: 'Structure comparison', order: 20, component: ComparisonView })
-registerPanel({ id: 'stream5-history', slot: 'history.main', title: 'Experiment history', order: 20, component: ExperimentHistory })
-registerPanel({ id: 'stream5-workflow', slot: 'design.main', title: 'Workflow', order: 20, component: WorkflowStepper })
-registerPanel({ id: 'stream5-candidate-library', slot: 'library.main', title: 'Curated candidate library', order: 20, component: CandidateLibrary })
-registerPanel({ id: 'stream5-dashboard', slot: 'dashboard.main', title: 'Overview', order: 20, component: Dashboard })
-registerPanel({ id: 'stream5-settings', slot: 'settings.main', title: 'Settings', order: 20, component: SettingsPanel })
+// One panel per page, plus the three that make up the Protein Explorer and the sidebar that
+// follows the active structure on every page.
+registerPanel({ id: 'dashboard', slot: 'dashboard.main', title: 'Overview', order: 20, component: Dashboard })
+registerPanel({ id: 'structure-explorer', slot: 'explorer.main', title: '3D structure', order: 10, component: StructureExplorer })
+registerPanel({ id: 'sequence', slot: 'explorer.below', title: 'Sequence', order: 10, component: SequencePanel })
+registerPanel({ id: 'pae', slot: 'explorer.below', title: 'Predicted aligned error', order: 30, component: PAEHeatmap })
+registerPanel({ id: 'design-workspace', slot: 'design.main', title: 'Design run', order: 20, component: WorkflowStepper })
+registerPanel({ id: 'candidate-library', slot: 'library.main', title: 'Interface review', order: 20, component: CandidateLibrary })
+registerPanel({ id: 'alignment', slot: 'analysis.main', title: 'Structural alignment', order: 20, component: AlignmentPanel })
+registerPanel({ id: 'experiment-comparison', slot: 'comparison.main', title: 'Experiment comparison', order: 20, component: ExperimentComparison })
+registerPanel({ id: 'experiment-history', slot: 'history.main', title: 'Experiment records', order: 20, component: ExperimentHistory })
+registerPanel({ id: 'settings', slot: 'settings.main', title: 'Settings', order: 20, component: SettingsPanel })
+registerPanel({ id: 'structure-details', slot: 'right', title: 'Structure details', order: 20, component: RightSidebar })

@@ -1,22 +1,25 @@
 import { USE_MOCKS } from './config'
-import { apiRequest, queryString } from './client'
-import { demoAlignment, demoExplanation } from './mocks'
-import type { AlignmentRequest, AlignmentResponse, ExplanationResponse } from './types'
+import { apiRequest } from './client'
+import { mockResponse } from './mocks'
+import type { AlignmentRequest, AlignmentResponse, ExplainResponse } from './types'
 
-export async function alignStructures(request: AlignmentRequest): Promise<AlignmentResponse> {
-  if (USE_MOCKS) return demoAlignment
-  return apiRequest<AlignmentResponse>('/analysis/align', {
-    method: 'POST',
-    body: JSON.stringify(request),
-  })
+export async function alignStructures(body: AlignmentRequest): Promise<AlignmentResponse> {
+  if (USE_MOCKS) return mockResponse('align')
+  return apiRequest('/analysis/align', { method: 'POST', body: JSON.stringify(body) })
 }
 
-export async function getExplanation(args: {
+export interface ExplainParams {
   structure: string
   chain?: string
   start?: number
   end?: number
-}): Promise<ExplanationResponse> {
-  if (USE_MOCKS) return { ...demoExplanation, structure_id: args.structure }
-  return apiRequest<ExplanationResponse>(`/explain${queryString(args)}`)
+}
+
+export async function getExplanation(params: ExplainParams): Promise<ExplainResponse> {
+  if (USE_MOCKS) return mockResponse('explain_predicted')
+  const query = new URLSearchParams({ structure: params.structure })
+  if (params.chain) query.set('chain', params.chain)
+  if (params.start !== undefined) query.set('start', String(params.start))
+  if (params.end !== undefined) query.set('end', String(params.end))
+  return apiRequest(`/explain?${query}`)
 }

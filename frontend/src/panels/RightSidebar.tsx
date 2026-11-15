@@ -1,223 +1,274 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
+import { useLocation } from 'react-router-dom'
+import { ApiError, experimentIdOf } from '@/api'
+import type { Experiment, PlddtResidue, Residue, Structure } from '@/api'
+import { useViewerState } from '@/viewer'
+import { bandOf } from './bands'
+import { ConfidenceSummary } from './Confidence'
+import { useExplanation, usePlddt, useResidues } from './details'
+import { errorMessage, formatDate, inputClass, sourceMeaning } from './format'
+import { useLibrary } from './library'
+import { explorerLink, historyLink } from './links'
+import { setActiveStructure, setSelectedResidue, usePanelState, type SelectedResidue } from './panelState'
 import {
-  Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from 'recharts'
-import {
-  getExplanation, getPlddt, getResidues, listExperiments, listStructures,
-} from '@/api'
-import type { Experiment, PlddtPoint, ResidueRecord, Structure } from '@/api'
-import { setActiveStructure, usePanelSelection } from './panelState'
+  Card, Code, EmptyState, ErrorNote, ExplainedText, KindBadge, Loading, Note, SourceBadge, StatusBadge,
+  StructureSelect, TextLink,
+} from './ui'
 
-function PanelCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-lg border border-border bg-card p-3">
-      <h3 className="mb-2 text-sm font-semibold">{title}</h3>
-      {children}
-    </section>
-  )
+function sameResidue(a: { chain: string; resseq: number; icode: string }, b: SelectedResidue): boolean {
+  return a.chain === b.chain && a.resseq === b.seqId && (a.icode || '') === (b.insCode ?? '')
 }
 
-function useSidebarData() {
-  const [structures, setStructures] = useState<Structure[]>([])
-  const [experiments, setExperiments] = useState<Experiment[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  useEffect(() => {
-    let alive = true
-    Promise.all([listStructures(), listExperiments()])
-      .then(([s, e]) => { if (alive) { setStructures(s); setExperiments(e) } })
-      .catch((e: unknown) => { if (alive) setError(e instanceof Error ? e.message : 'Could not load sidebar data') })
-      .finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
-  }, [])
-  return { structures, experiments, error, loading }
-}
-
-export function ConfidencePanel({ structureId, points }: {
-  structureId: string | null
-  points: PlddtPoint[]
-}) {
-  const bins = useMemo(() => {
-    const labels = ['0–50', '50–70', '70–90', '90–100']
-    const counts = [0, 0, 0, 0]
-    for (const point of points) {
-      const score = point.plddt
-      if (score < 50) counts[0]++
-      else if (score < 70) counts[1]++
-      else if (score < 90) counts[2]++
-      else counts[3]++
-    }
-    return labels.map((range, i) => ({ range, residues: counts[i] }))
-  }, [points])
-
+/** What the structure is and where it came from. */
+export function StructureFacts({ structure }: { structure: Structure }) {
+  const experimentId = experimentIdOf(structure)
+  const { provenance } = structure
   return (
-    <PanelCard title="Confidence (pLDDT)">
-      {!structureId ? <p className="text-xs text-muted-foreground">Select a structure to inspect confidence.</p>
-        : points.length === 0 ? <p className="text-xs text-muted-foreground">No pLDDT values are available.</p>
-          : <>
-            <div className="h-36" role="img" aria-label="pLDDT histogram">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={bins}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="range" tick={{ fontSize: 10 }} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
-                  <Tooltip />
-                  <Bar dataKey="residues" fill="#2dd4bf" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              pLDDT is a model-confidence estimate, not experimental validation.
-            </p>
-          </>}
-    </PanelCard>
-  )
-}
-
-export function StructuralMetricsPanel({ structure, experiments }: {
-  structure: Structure | null
-  experiments: Experiment[]
-}) {
-  const related = experiments.filter((e) =>
-    e.inputs.includes(structure?.id ?? '') || e.outputs.includes(structure?.id ?? ''),
-  )
-  return (
-    <PanelCard title="Structural metrics">
-      {!structure ? <p className="text-xs text-muted-foreground">No structure selected.</p> : (
-        <dl className="grid grid-cols-2 gap-2 text-xs">
-          <div><dt className="text-muted-foreground">Residues</dt><dd className="font-mono">{structure.n_residues}</dd></div>
-          <div><dt className="text-muted-foreground">Chains</dt><dd className="font-mono">{structure.chains.length}</dd></div>
-          <div><dt className="text-muted-foreground">Format</dt><dd>{structure.format.toUpperCase()}</dd></div>
-          <div><dt className="text-muted-foreground">Source</dt><dd>{structure.source}</dd></div>
-          {related.flatMap((e) => Object.entries(e.metrics).map(([key, value]) => (
-            <div key={`${e.id}-${key}`}><dt className="text-muted-foreground">{key}</dt><dd className="font-mono">{String(value ?? '—')}</dd></div>
-          )))}
+    <Card tight title={structure.label}>
+      <div className="space-y-3 text-[0.8125rem]">
+        <div>
+          <SourceBadge source={structure.source} />
+          <p className="mt-1.5 text-muted-foreground">{sourceMeaning(structure.source)}</p>
+        </div>
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5">
+          <dt className="text-muted-foreground">Residues</dt>
+          <dd>{structure.n_residues}</dd>
+          <dt className="text-muted-foreground">Chains</dt>
+          <dd>{structure.chains.length === 0 ? 'none' : structure.chains.map((c) => `${c.id} (${c.n_residues})`).join(', ')}</dd>
+          <dt className="text-muted-foreground">Format</dt>
+          <dd>{structure.format === 'mmcif' ? 'mmCIF' : structure.format.toUpperCase()}</dd>
+          {structure.origin_id && (
+            <>
+              <dt className="text-muted-foreground">Origin</dt>
+              <dd className="font-mono break-all">{structure.origin_id}</dd>
+            </>
+          )}
+          <dt className="text-muted-foreground">Source</dt>
+          <dd className="break-words">
+            {provenance.url
+              ? <a className="fs-link" href={provenance.url} target="_blank" rel="noreferrer">{provenance.source}</a>
+              : provenance.source}
+          </dd>
+          <dt className="text-muted-foreground">Retrieved</dt>
+          <dd>{formatDate(provenance.retrieved_at)}</dd>
+          {experimentId && (
+            <>
+              <dt className="text-muted-foreground">Experiment</dt>
+              <dd className="break-all"><TextLink to={historyLink(experimentId)}>{experimentId}</TextLink></dd>
+            </>
+          )}
+          <dt className="text-muted-foreground">File hash</dt>
+          <dd className="font-mono" title={`sha256 ${structure.sha256}`}>{structure.sha256.slice(0, 12)}</dd>
         </dl>
+        {provenance.notes && <Note>{provenance.notes}</Note>}
+      </div>
+    </Card>
+  )
+}
+
+/** pLDDT for a predicted model; for anything else, why there is none. */
+export function ConfidencePanel({ structure, selected, onSelect }: {
+  structure: Structure
+  selected: SelectedResidue | null
+  onSelect: (residue: PlddtResidue) => void
+}) {
+  const plddt = usePlddt(structure)
+  let body
+  if (structure.format === 'fasta') {
+    body = <Note>A sequence on its own has no predicted structure, so there is no confidence to report.</Note>
+  } else if (structure.source !== 'predicted') {
+    body = (
+      <Note>
+        Not reported. This structure is {structure.source === 'experimental' ? 'experimental' : 'not declared as a predicted model'},
+        so its B-factor column is not read as pLDDT.
+      </Note>
+    )
+  } else if (plddt.state === 'ok') {
+    const index = selected ? plddt.data.per_residue.findIndex((r) => sameResidue(r, selected)) : -1
+    body = <ConfidenceSummary plddt={plddt.data} selectedIndex={index >= 0 ? index : null} onSelect={onSelect} />
+  } else if (plddt.state === 'error') {
+    body = <ErrorNote>{errorMessage(plddt.error, 'pLDDT could not be loaded.')}</ErrorNote>
+  } else {
+    body = <Loading>Reading pLDDT…</Loading>
+  }
+  return <Card tight title="Model confidence (pLDDT)">{body}</Card>
+}
+
+/** The clicked residue: what it is, its pLDDT if it has one, and the rule-based sentence for it. */
+export function ResiduePanel({ structure, selected, residues, plddt }: {
+  structure: Structure
+  selected: SelectedResidue | null
+  residues: Residue[] | null
+  plddt: PlddtResidue[] | null
+}) {
+  const residue = selected && residues ? residues.find((r) => sameResidue(r, selected)) ?? null : null
+  const score = selected && plddt ? plddt.find((r) => sameResidue(r, selected)) ?? null : null
+  const explanation = useExplanation(
+    residue ? structure.id : null,
+    residue ? { chain: residue.chain, start: residue.resseq, end: residue.resseq } : null,
+  )
+
+  let body
+  if (!selected) {
+    body = <Note>Click a residue in the 3D view, in the sequence, or on the pLDDT line to read about it here.</Note>
+  } else if (!residues) {
+    body = <Loading>Loading residues…</Loading>
+  } else if (!residue) {
+    body = (
+      <Note>
+        {selected.compId ?? 'The clicked group'} {selected.chain}:{selected.seqId}{selected.insCode ?? ''} is not an
+        amino-acid residue of this structure (it may be a ligand, an ion or water), so there is nothing to report for it.
+      </Note>
+    )
+  } else {
+    body = (
+      <div className="space-y-3 text-[0.8125rem]">
+        <p className="text-base font-semibold">
+          {residue.resname} {residue.resseq}{residue.icode}
+          <span className="ml-2 text-[0.8125rem] font-normal text-muted-foreground">chain {residue.chain}, one-letter code {residue.aa}</span>
+        </p>
+        {score && (
+          <p className="flex items-center gap-2">
+            <span aria-hidden className="size-2.5 rounded-sm" style={{ backgroundColor: bandOf(score.bin)?.css }} />
+            <span><span className="font-semibold">{score.plddt.toFixed(1)}</span> pLDDT, {bandOf(score.bin)?.label.toLowerCase() ?? score.bin}</span>
+          </p>
+        )}
+        {!residue.has_ca && <Note>This residue has no CA atom in the file, so it is left out of alignments.</Note>}
+        {explanation.state === 'ok' && <ExplainedText value={explanation.data} compact />}
+        {explanation.state === 'loading' && <Loading>Building the explanation…</Loading>}
+        {explanation.state === 'error' && <ErrorNote>{errorMessage(explanation.error, 'The explanation could not be loaded.')}</ErrorNote>}
+      </div>
+    )
+  }
+  return <Card tight title="Selected residue">{body}</Card>
+}
+
+/** The rule-based description of one chain. Sentences are fixed templates filled with measured values. */
+export function ExplanationPanel({ structure }: { structure: Structure }) {
+  const [chosen, setChosen] = useState<{ structureId: string; chain: string } | null>(null)
+  const chains = structure.chains.map((c) => c.id)
+  const chain = chosen && chosen.structureId === structure.id && chains.includes(chosen.chain) ? chosen.chain : chains[0] ?? null
+  const explanation = useExplanation(
+    structure.format === 'fasta' || !chain ? null : structure.id,
+    chain && chains.length > 1 ? { chain } : null,
+  )
+
+  return (
+    <Card
+      tight
+      title="What the numbers say"
+      actions={chains.length > 1 && (
+        <select
+          aria-label="Chain to describe"
+          value={chain ?? ''}
+          onChange={(e) => setChosen({ structureId: structure.id, chain: e.target.value })}
+          className={`${inputClass} h-7 px-1.5 text-[0.8125rem]`}
+        >
+          {chains.map((id) => <option key={id} value={id}>Chain {id}</option>)}
+        </select>
       )}
-    </PanelCard>
+    >
+      {structure.format === 'fasta' ? <Note>There is no structure to describe for a sequence-only record.</Note>
+        : explanation.state === 'ok' ? <ExplainedText value={explanation.data} compact />
+          : explanation.state === 'error' ? <ErrorNote>{errorMessage(explanation.error, 'The explanation could not be loaded.')}</ErrorNote>
+            : <Loading>Building the explanation…</Loading>}
+    </Card>
   )
 }
 
-export function ResidueInfoPanel({ residues, selected }: {
-  residues: ResidueRecord[]
-  selected: { chain: string; seqId: number; compId?: string; insCode?: string } | null
-}) {
-  const residue = selected && residues.find((r) =>
-    r.chain === selected.chain && r.seq_id === selected.seqId &&
-    (!('insCode' in selected) || !selected.insCode || (r.ins_code ?? '') === selected.insCode),
-  )
+/** The experiment record a structure was registered from, if it came from one. */
+export function ProvenancePanel({ structure, experiments }: { structure: Structure; experiments: Experiment[] }) {
+  const experimentId = experimentIdOf(structure)
+  const experiment = experimentId ? experiments.find((e) => e.id === experimentId) ?? null : null
+  if (!experimentId) return null
   return (
-    <PanelCard title="Selected residue">
-      {!selected ? <p className="text-xs text-muted-foreground">Click a residue in the viewer to inspect it.</p>
-        : !residue ? <p className="text-xs text-muted-foreground">Residue {selected.chain}:{selected.seqId} is not in the loaded residue response.</p>
-          : <dl className="grid grid-cols-2 gap-2 text-xs">
-            <div><dt className="text-muted-foreground">Chain</dt><dd>{residue.chain}</dd></div>
-            <div><dt className="text-muted-foreground">Position</dt><dd>{residue.seq_id}{residue.ins_code ?? ''}</dd></div>
-            <div><dt className="text-muted-foreground">Residue</dt><dd>{residue.comp_id}</dd></div>
-            <div><dt className="text-muted-foreground">pLDDT</dt><dd>{residue.plddt ?? 'Unavailable'}</dd></div>
-          </dl>}
-    </PanelCard>
+    <Card tight title="Where it came from">
+      {!experiment ? (
+        <Note>
+          Registered from experiment <Code>{experimentId}</Code>, which is no longer in the experiment list.
+        </Note>
+      ) : (
+        <div className="space-y-2 text-[0.8125rem]">
+          <p className="font-medium">{experiment.model_name}</p>
+          <p className="flex flex-wrap items-center gap-2"><KindBadge kind={experiment.kind} /><StatusBadge status={experiment.status} /></p>
+          <p className="text-muted-foreground">{experiment.provenance.source}, recorded {formatDate(experiment.created_at)}.</p>
+          {experiment.error && <ErrorNote>{experiment.error}</ErrorNote>}
+          <p><TextLink to={historyLink(experiment.id)}>Open the experiment record</TextLink></p>
+        </div>
+      )}
+    </Card>
   )
 }
 
-export function ExplanationPanel({ explanation, error }: {
-  explanation: Awaited<ReturnType<typeof getExplanation>> | null
-  error: string | null
-}) {
-  return (
-    <PanelCard title="Scientific explanation">
-      {error ? <p role="alert" className="text-xs text-destructive">{error}</p>
-        : !explanation ? <p className="text-xs text-muted-foreground">No explanation available.</p>
-          : <>
-            <p className="text-xs leading-relaxed">{explanation.summary}</p>
-            <h4 className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Numbers used</h4>
-            <dl className="mt-1 grid grid-cols-2 gap-2 text-xs">
-              {Object.entries(explanation.numbers_used).map(([key, value]) => (
-                <div key={key}><dt className="text-muted-foreground">{key}</dt><dd className="font-mono">{String(value ?? '—')}</dd></div>
-              ))}
-            </dl>
-            {explanation.limitations?.map((item) => <p key={item} className="mt-2 text-[11px] text-muted-foreground">{item}</p>)}
-          </>}
-    </PanelCard>
-  )
-}
-
-export function ProvenancePanel({ experiments }: { experiments: Experiment[] }) {
-  return (
-    <PanelCard title="Model provenance">
-      {experiments.length === 0 ? <p className="text-xs text-muted-foreground">No experiment provenance is available.</p>
-        : experiments.map((experiment) => (
-          <div key={experiment.id} className="mb-2 border-b border-border pb-2 last:mb-0 last:border-0">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-medium">{experiment.model_name}</span>
-              <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase">
-                {experiment.kind}
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">{experiment.provenance.source} · {experiment.status}</p>
-            <p className="text-[11px] text-muted-foreground">{experiment.provenance.notes}</p>
-          </div>
-        ))}
-    </PanelCard>
-  )
-}
-
+/** Details of the active structure. Lives in the right sidebar on every page. */
 export function RightSidebar() {
-  const { structures, experiments, error, loading } = useSidebarData()
-  const { activeStructureId, selectedResidue } = usePanelSelection()
-  const selectedId = activeStructureId ?? structures[0]?.id ?? null
-  const structure = structures.find((s) => s.id === selectedId) ?? null
-  const [points, setPoints] = useState<PlddtPoint[]>([])
-  const [residues, setResidues] = useState<ResidueRecord[]>([])
-  const [explanation, setExplanation] = useState<Awaited<ReturnType<typeof getExplanation>> | null>(null)
-  const [detailError, setDetailError] = useState<string | null>(null)
+  const library = useLibrary()
+  const { activeStructureId, selectedResidue } = usePanelState()
+  const { adapter } = useViewerState()
+  const location = useLocation()
+  const onExplorer = location.pathname === '/explorer'
+  // On the Explorer the viewer panel decides what is active (it may be showing a local sample
+  // file, with nothing active). Elsewhere, describe the first structure until one is chosen.
+  const structure = library.structures.find((s) => s.id === activeStructureId)
+    ?? (onExplorer ? null : library.structures[0] ?? null)
+  const viewable = structure !== null && structure.format !== 'fasta'
+  const residues = useResidues(viewable ? structure.id : null)
+  const plddt = usePlddt(structure)
+  const selected = structure && selectedResidue?.structureId === structure.id ? selectedResidue : null
 
-  useEffect(() => {
-    if (!selectedId) return
-    setActiveStructure(selectedId)
-    let alive = true
-    setPoints([])
-    setResidues([])
-    setExplanation(null)
-    setDetailError(null)
-    Promise.allSettled([getPlddt(selectedId), getResidues(selectedId), getExplanation({ structure: selectedId })])
-      .then(([p, r, x]) => {
-        if (!alive) return
-        if (p.status === 'fulfilled') setPoints(p.value.residues ?? [])
-        if (r.status === 'fulfilled') setResidues(r.value.residues ?? [])
-        if (x.status === 'fulfilled') setExplanation(x.value)
-        const failures = [p, r, x].filter((result) => result.status === 'rejected') as PromiseRejectedResult[]
-        if (failures.length) setDetailError(failures.map(({ reason }) =>
-          reason instanceof Error ? reason.message : 'Unable to load one or more structure details',
-        ).join('; '))
-      })
-    return () => { alive = false }
-  }, [selectedId])
+  function selectFromChart(residue: PlddtResidue) {
+    if (!structure) return
+    setSelectedResidue({ structureId: structure.id, chain: residue.chain, seqId: residue.resseq, insCode: residue.icode || undefined, compId: residue.resname })
+    if (onExplorer) adapter?.highlightResidues(residue.chain, [{ start: residue.resseq, end: residue.resseq }], { focus: true })
+  }
 
-  if (loading) return <div role="status" className="text-xs text-muted-foreground">Loading structure details…</div>
-  if (error) return <div role="alert" className="rounded border border-destructive/40 p-3 text-xs text-destructive">{error}</div>
-  if (!structures.length) return <div className="rounded border border-dashed border-border p-3 text-xs text-muted-foreground">No structures loaded. Upload or fetch a structure to begin.</div>
+  if (library.status !== 'ready') return <Loading>Loading structure details…</Loading>
 
   return (
     <div className="flex flex-col gap-3">
-      <label className="text-xs text-muted-foreground">
-        Active structure
-        <select className="mt-1 w-full rounded-md border border-border bg-background p-2 text-xs text-foreground"
-          value={selectedId ?? ''} onChange={(e) => setActiveStructure(e.target.value)}>
-          {structures.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-        </select>
-      </label>
-      {detailError && <p role="alert" className="text-xs text-destructive">{detailError}</p>}
-      <ConfidencePanel structureId={selectedId} points={points} />
-      <StructuralMetricsPanel structure={structure} experiments={experiments} />
-      <ResidueInfoPanel residues={residues} selected={selectedResidue?.structureId === selectedId ? selectedResidue : null} />
-      <ExplanationPanel explanation={explanation} error={detailError} />
-      <ProvenancePanel experiments={experiments.filter((e) =>
-        e.inputs.includes(selectedId ?? '') || e.outputs.includes(selectedId ?? ''),
-      )} />
-      <p className="text-[10px] leading-relaxed text-muted-foreground">
-        pLDDT and PAE are model-confidence estimates. They do not establish folding, binding, affinity, efficacy, or safety. FoldStudio is not a clinical tool.
-      </p>
+      {library.error && <ErrorNote>{library.error}</ErrorNote>}
+      {library.structures.length === 0 ? (
+        <EmptyState title="No structures yet">
+          Add one in the Protein Explorer, or put a bundle in <Code>data/experiments/</Code> and restart the backend.
+        </EmptyState>
+      ) : (
+        <>
+          <label className="flex flex-col gap-1 text-[0.8125rem] text-muted-foreground">
+            Structure
+            <StructureSelect
+              structures={library.structures}
+              value={structure?.id ?? ''}
+              onChange={(id) => id && setActiveStructure(id)}
+              placeholder={structure ? undefined : 'Choose a structure'}
+              className="text-foreground"
+            />
+          </label>
+          {!structure ? (
+            <Note>Choose a structure to see where it came from, its confidence and what can be said about it.</Note>
+          ) : (
+            <>
+              {!onExplorer && viewable && <p className="text-[0.8125rem]"><TextLink to={explorerLink(structure.id)}>Open in the 3D viewer</TextLink></p>}
+              <StructureFacts structure={structure} />
+              <ConfidencePanel structure={structure} selected={selected} onSelect={selectFromChart} />
+              <ResiduePanel
+                structure={structure}
+                selected={selected}
+                residues={residues.state === 'ok' ? residues.data.residues : null}
+                plddt={plddt.state === 'ok' ? plddt.data.per_residue : null}
+              />
+              {residues.state === 'error' && !(residues.error instanceof ApiError && residues.error.status === 409) && (
+                <ErrorNote>{errorMessage(residues.error, 'Residues could not be loaded.')}</ErrorNote>
+              )}
+              <ExplanationPanel structure={structure} />
+              <ProvenancePanel structure={structure} experiments={library.experiments} />
+            </>
+          )}
+        </>
+      )}
+      <Note>
+        pLDDT and PAE are model-confidence estimates. They do not establish folding, binding, affinity, efficacy, or
+        safety. FoldStudio is not a clinical tool.
+      </Note>
     </div>
   )
 }
