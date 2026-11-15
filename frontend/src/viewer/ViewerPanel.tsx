@@ -30,6 +30,12 @@ export interface ViewerPanelProps {
   secondMatrix?: Matrix4x4
   secondLayout?: SecondLayout
   initialRepresentation?: RepresentationKind
+  /**
+   * Colouring to use until the person picks one. The Explorer passes "plddt" for predicted models,
+   * so confidence is what you see first; an overlay of two structures always starts uniform,
+   * because that is the only scheme that tells the two apart.
+   */
+  defaultColorScheme?: ColorScheme
   highlight?: { chain: string; ranges: ResidueRange[] } | null
   onResidueClick?: (e: ResidueClickEvent) => void
   onReady?: (adapter: ViewerAdapter) => void
@@ -70,6 +76,7 @@ export function ViewerPanel({
   secondMatrix,
   secondLayout = 'overlay',
   initialRepresentation = 'cartoon',
+  defaultColorScheme = 'chain',
   highlight,
   onResidueClick,
   onReady,
@@ -92,7 +99,7 @@ export function ViewerPanel({
   onReadyRef.current = onReady
 
   // With two structures overlaid, uniform colours (teal vs purple) are the only way to tell them apart.
-  const scheme: ColorScheme = userScheme ?? (secondUrl ? 'uniform' : 'chain')
+  const scheme: ColorScheme = userScheme ?? (secondUrl ? 'uniform' : defaultColorScheme)
 
   // 1. Create + initialise the adapter once per mount.
   useEffect(() => {

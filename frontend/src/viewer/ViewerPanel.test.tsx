@@ -89,6 +89,27 @@ describe('ViewerPanel', () => {
     expect(legend).toHaveTextContent(/not proof of folding, binding/i)
   })
 
+  it('starts in the colour scheme it is given, until the person picks another', async () => {
+    const { adapter, mocks } = fakeAdapter()
+    const view = render(
+      <ViewerPanel url="/samples/a.pdb" format="pdb" structureKind="predicted" defaultColorScheme="plddt" adapterFactory={async () => adapter} />,
+    )
+    await waitFor(() => expect(screen.getByLabelText('Colour by')).toBeEnabled())
+    expect(screen.getByLabelText('Colour by')).toHaveValue('plddt')
+    expect(mocks.colorBy).toHaveBeenLastCalledWith('plddt')
+    expect(screen.getByTestId('plddt-legend')).toBeInTheDocument()
+
+    // A new default (another structure) is followed while no choice has been made ...
+    view.rerender(<ViewerPanel url="/samples/b.pdb" format="pdb" structureKind="experimental" defaultColorScheme="chain" adapterFactory={async () => adapter} />)
+    await waitFor(() => expect(mocks.colorBy).toHaveBeenLastCalledWith('chain'))
+    // ... and a choice, once made, is kept.
+    await userEvent.selectOptions(screen.getByLabelText('Colour by'), 'secondary-structure')
+    view.rerender(<ViewerPanel url="/samples/c.pdb" format="pdb" structureKind="predicted" defaultColorScheme="plddt" adapterFactory={async () => adapter} />)
+    await waitFor(() => expect(mocks.load).toHaveBeenLastCalledWith('/samples/c.pdb', 'pdb'))
+    expect(screen.getByLabelText('Colour by')).toHaveValue('secondary-structure')
+    expect(mocks.colorBy).toHaveBeenLastCalledWith('secondary-structure')
+  })
+
   it('warns that experimental structures carry B-factors, not pLDDT', async () => {
     const { adapter } = fakeAdapter()
     render(<ViewerPanel url="/samples/a.pdb" format="pdb" structureKind="experimental" adapterFactory={async () => adapter} />)
@@ -113,6 +134,31 @@ describe('ViewerPanel', () => {
     )
     await waitFor(() => expect(mocks.loadSecond).toHaveBeenCalledWith('/samples/b.cif', matrix, { format: 'mmcif', layout: 'overlay' }))
     expect(mocks.colorBy).toHaveBeenCalledWith('uniform')
+  })
+
+  it('starts an overlay in uniform colours whatever default it was given, because only that tells the two apart', async () => {
+    const { adapter, mocks } = fakeAdapter()
+    const matrix = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+    render(
+      <ViewerPanel url="/samples/a.pdb" format="pdb" defaultColorScheme="plddt" secondUrl="/samples/b.pdb" secondFormat="pdb" secondMatrix={matrix} adapterFactory={async () => adapter} />,
+    )
+    await waitFor(() => expect(mocks.loadSecond).toHaveBeenCalled())
+    expect(mocks.colorBy).toHaveBeenLastCalledWith('uniform')
+    expect(mocks.colorBy).not.toHaveBeenCalledWith('plddt')
+  })
+
+  it('reloads the second structure when the layout changes', async () => {
+    const { adapter, mocks } = fakeAdapter()
+    const matrix = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+    const view = render(
+      <ViewerPanel url="/samples/a.pdb" format="pdb" secondUrl="/samples/b.pdb" secondFormat="pdb" secondMatrix={matrix} adapterFactory={async () => adapter} />,
+    )
+    await waitFor(() => expect(mocks.loadSecond).toHaveBeenCalledTimes(1))
+    view.rerender(
+      <ViewerPanel url="/samples/a.pdb" format="pdb" secondUrl="/samples/b.pdb" secondFormat="pdb" secondMatrix={matrix} secondLayout="side-by-side" adapterFactory={async () => adapter} />,
+    )
+    await waitFor(() => expect(mocks.loadSecond).toHaveBeenLastCalledWith('/samples/b.pdb', matrix, { format: 'pdb', layout: 'side-by-side' }))
+    expect(screen.queryByText(/Second structure:/)).not.toBeInTheDocument()
   })
 
   it('highlights residues and reports clicked residues', async () => {

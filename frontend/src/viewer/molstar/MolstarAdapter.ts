@@ -211,7 +211,10 @@ export class MolstarAdapter implements ViewerAdapter {
 
   private async removeSecond() {
     if (this.slots.length < 2) return
-    const [, second] = this.slots.splice(1, 1)
+    // splice returns the removed elements, so the second slot is element 0 of the result.
+    // (This used to read element 1, which is always undefined: replacing or unloading the second
+    // structure threw, and the old one stayed in the scene.)
+    const [second] = this.slots.splice(1, 1)
     await this.p.build().delete(second.data).commit()
   }
 
